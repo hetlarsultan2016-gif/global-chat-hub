@@ -1,52 +1,63 @@
-import { useState } from 'react';
-import { useChatStore, getUsers, saveUsers } from '@/lib/chatStore';
+import { useState, useEffect } from 'react';
+import { useChatStore } from '@/lib/chatStore';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function ProfilePage() {
-  const { currentUser } = useChatStore();
-  const users = getUsers();
-  const user = users.find((u) => u.name === currentUser);
+  const { currentUserId } = useChatStore();
+  const [profile, setProfile] = useState<any>(null);
+  const [bio, setBio] = useState('');
+  const [age, setAge] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const [status, setStatus] = useState(user?.status || '');
-  const [age, setAge] = useState(user?.age || '');
-  const [profilePic, setProfilePic] = useState(user?.profile || '');
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!currentUserId) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .single();
+      if (data) {
+        setProfile(data);
+        setBio(data.bio || '');
+        setAge(data.age?.toString() || '');
+      }
+    };
+    fetchProfile();
+  }, [currentUserId]);
 
-  const handleSave = () => {
-    const allUsers = getUsers();
-    const u = allUsers.find((x) => x.name === currentUser);
-    if (!u) return;
-    u.status = status || u.status;
-    u.age = age || u.age;
-    u.profile = profilePic || u.profile;
-    saveUsers(allUsers);
+  const handleSave = async () => {
+    if (!currentUserId) return;
+    setLoading(true);
+    await supabase
+      .from('profiles')
+      .update({
+        bio: bio || null,
+        age: age ? parseInt(age) : null,
+      })
+      .eq('user_id', currentUserId);
+    setLoading(false);
     alert('تم حفظ الملف الشخصي');
   };
 
-  const handlePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setProfilePic(ev.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  const genderLabel = (g: string | null) => {
+    if (g === 'male') return 'ذكر';
+    if (g === 'female') return 'أنثى';
+    return 'غير محدد';
   };
 
   return (
     <div className="flex flex-col items-center gap-4 py-4">
       <div className="w-24 h-24 rounded-full bg-secondary overflow-hidden">
-        {profilePic && <img src={profilePic} className="w-full h-full object-cover" alt="صورة" />}
+        {profile?.avatar_url && <img src={profile.avatar_url} className="w-full h-full object-cover" alt="صورة" />}
       </div>
-      <label className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all active:scale-95">
-        تغيير الصورة
-        <input type="file" accept="image/*" onChange={handlePicChange} className="hidden" />
-      </label>
 
       <div className="w-full max-w-sm space-y-3">
         <input
           className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-          placeholder="الحالة الشخصية"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
+          placeholder="نبذة عنك"
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
         />
         <input
           className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
@@ -54,16 +65,17 @@ export default function ProfilePage() {
           value={age}
           onChange={(e) => setAge(e.target.value)}
         />
-        <button onClick={handleSave} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95">
-          حفظ التغييرات
+        <button disabled={loading} onClick={handleSave} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95 disabled:opacity-50">
+          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
         </button>
       </div>
 
-      {user && (
+      {profile && (
         <div className="text-muted-foreground text-sm text-center space-y-1 mt-4">
-          <p>الاسم: {user.name}</p>
-          <p>النوع: {user.gender}</p>
-          <p>العمر: {user.age}</p>
+          <p>الاسم: {profile.username}</p>
+          <p>النوع: {genderLabel(profile.gender)}</p>
+          <p>العمر: {profile.age || 'غير محدد'}</p>
+          <p>المستوى: {profile.level}</p>
         </div>
       )}
     </div>

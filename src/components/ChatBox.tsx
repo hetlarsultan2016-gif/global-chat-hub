@@ -1,58 +1,78 @@
 import { useEffect, useRef, useState } from 'react';
-import { getMessages, sendTextMessage, sendMediaMessage, ChatMessage, useChatStore } from '@/lib/chatStore';
+import { supabase } from '@/integrations/supabase/client';
+import { useChatStore } from '@/lib/chatStore';
 
 interface ChatBoxProps {
-  chatId: string;
+  roomId: string;
   showEmoji?: boolean;
-  showMedia?: boolean;
+}
+
+interface MessageWithProfile {
+  id: string;
+  text: string;
+  created_at: string;
+  user_id: string;
+  profiles: { username: string; avatar_url: string | null } | null;
 }
 
 const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪'];
 
-export default function ChatBox({ chatId, showEmoji = true, showMedia = true }: ChatBoxProps) {
-  const { currentUser } = useChatStore();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
+  const { currentUserId } = useChatStore();
+  const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const loadMessages = async () => {
+    const { data } = await supabase
+      .from('messages')
+      .select('id, text, created_at, user_id, profiles(username, avatar_url)')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: true })
+      .limit(100);
+    if (data) setMessages(data as unknown as MessageWithProfile[]);
+  };
+
   useEffect(() => {
-    const load = () => setMessages(getMessages(chatId));
-    load();
-    const interval = setInterval(load, 1000);
-    return () => clearInterval(interval);
-  }, [chatId]);
+    loadMessages();
+
+    const channel = supabase
+      .channel(`room-${roomId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `room_id=eq.${roomId}`,
+      }, () => {
+        loadMessages();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [roomId]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  const handleSend = () => {
-    if (!text.trim() || !currentUser) return;
-    sendTextMessage(chatId, currentUser, text);
+  const handleSend = async () => {
+    if (!text.trim() || !currentUserId) return;
+    const msg = text;
     setText('');
-    setMessages(getMessages(chatId));
+    await supabase.from('messages').insert({
+      room_id: roomId,
+      user_id: currentUserId,
+      text: msg,
+    });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSend();
   };
 
-  const handleFile = (type: 'image' | 'audio') => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = type === 'image' ? 'image/*' : 'audio/*';
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (!file || !currentUser) return;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        sendMediaMessage(chatId, currentUser, type, e.target?.result as string);
-        setMessages(getMessages(chatId));
-      };
-      reader.readAsDataURL(file);
-    };
-    input.click();
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -61,18 +81,18 @@ export default function ChatBox({ chatId, showEmoji = true, showMedia = true }: 
         {messages.length === 0 && (
           <p className="text-center text-muted-foreground text-sm py-8">لا توجد رسائل بعد...</p>
         )}
-        {messages.map((m, i) => (
+        {messages.map((m) => (
           <div
-            key={i}
+            key={m.id}
             className={`message-bubble max-w-[85%] px-4 py-2.5 text-sm ${
-              m.user === currentUser ? 'message-sent self-end ml-auto' : 'message-received self-start mr-auto'
+              m.user_id === currentUserId ? 'message-sent self-end ml-auto' : 'message-received self-start mr-auto'
             }`}
           >
-            <span className="font-semibold text-xs opacity-80 block mb-1">{m.user}</span>
-            {m.type === 'text' && <span>{m.msg}</span>}
-            {m.type === 'image' && <img src={m.data} className="max-w-[200px] rounded-lg mt-1" alt="صورة" />}
-            {m.type === 'audio' && <audio controls src={m.data} className="mt-1 max-w-[200px]" />}
-            <div className="text-[10px] opacity-50 mt-1 text-left">{m.time}</div>
+            <span className="font-semibold text-xs opacity-80 block mb-1">
+              {m.profiles?.username || 'مجهول'}
+            </span>
+            <span>{m.text}</span>
+            <div className="text-[10px] opacity-50 mt-1 text-left">{formatTime(m.created_at)}</div>
           </div>
         ))}
       </div>
@@ -99,16 +119,6 @@ export default function ChatBox({ chatId, showEmoji = true, showMedia = true }: 
           <button onClick={() => setShowEmojis(!showEmojis)} className="bg-transparent text-muted-foreground hover:text-foreground p-1 text-lg">
             😊
           </button>
-        )}
-        {showMedia && (
-          <>
-            <button onClick={() => handleFile('image')} className="bg-transparent text-muted-foreground hover:text-foreground p-1 text-lg">
-              📷
-            </button>
-            <button onClick={() => handleFile('audio')} className="bg-transparent text-muted-foreground hover:text-foreground p-1 text-lg">
-              🎤
-            </button>
-          </>
         )}
         <button onClick={handleSend} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95">
           إرسال
