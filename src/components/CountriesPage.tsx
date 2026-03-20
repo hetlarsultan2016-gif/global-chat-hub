@@ -15,10 +15,7 @@ export default function CountriesPage() {
 
   useEffect(() => {
     const fetchRooms = async () => {
-      const { data } = await supabase
-        .from('rooms')
-        .select('*')
-        .order('is_pinned', { ascending: false });
+      const { data } = await supabase.from('rooms').select('*').order('is_pinned', { ascending: false });
       if (data) setRooms(data);
     };
     fetchRooms();
@@ -26,31 +23,40 @@ export default function CountriesPage() {
 
   if (selectedRoom) {
     return (
-      <div className="flex flex-col h-full">
-        <button onClick={() => setSelectedRoom(null)} className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-sm font-semibold mb-3 self-start transition-all active:scale-95">
-          ← رجوع
+      <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <button
+          onClick={() => setSelectedRoom(null)}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 self-start px-2 py-1 rounded-lg hover:bg-secondary"
+        >
+          <span>→</span>
+          <span>رجوع</span>
         </button>
-        <p className="text-sm text-muted-foreground mb-2">{selectedRoom.image} {selectedRoom.name}</p>
+        <div className="flex items-center gap-2 mb-3 px-1">
+          <span className="text-xl">{selectedRoom.image}</span>
+          <p className="font-bold text-sm">{selectedRoom.name}</p>
+        </div>
         <ChatBox roomId={selectedRoom.id} />
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {rooms.map((room) => (
-        <button
-          key={room.id}
-          onClick={() => setSelectedRoom(room)}
-          className="bg-card border border-border text-foreground p-4 rounded-xl font-semibold text-sm hover:bg-secondary transition-all active:scale-95 text-right"
-        >
-          <span className="text-lg block mb-1">{room.image}</span>
-          <span className="block">{room.name}</span>
-          {room.description && (
-            <span className="text-xs text-muted-foreground block mt-1 font-normal">{room.description}</span>
-          )}
-        </button>
-      ))}
+    <div style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-lg">🌎</span>
+        <h2 className="font-bold text-base">غرف الدول</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {rooms.map((room) => (
+          <button key={room.id} onClick={() => setSelectedRoom(room)} className="card-room text-right">
+            <span className="text-2xl block mb-2">{room.image}</span>
+            <span className="font-bold text-sm block">{room.name}</span>
+            {room.description && (
+              <span className="text-[11px] text-muted-foreground block mt-1 line-clamp-2 leading-relaxed">{room.description}</span>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

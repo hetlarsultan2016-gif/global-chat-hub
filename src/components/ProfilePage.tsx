@@ -8,20 +8,13 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('');
   const [age, setAge] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
       if (!currentUserId) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .single();
-      if (data) {
-        setProfile(data);
-        setBio(data.bio || '');
-        setAge(data.age?.toString() || '');
-      }
+      const { data } = await supabase.from('profiles').select('*').eq('user_id', currentUserId).single();
+      if (data) { setProfile(data); setBio(data.bio || ''); setAge(data.age?.toString() || ''); }
     };
     fetchProfile();
   }, [currentUserId]);
@@ -29,15 +22,10 @@ export default function ProfilePage() {
   const handleSave = async () => {
     if (!currentUserId) return;
     setLoading(true);
-    await supabase
-      .from('profiles')
-      .update({
-        bio: bio || null,
-        age: age ? parseInt(age) : null,
-      })
-      .eq('user_id', currentUserId);
+    await supabase.from('profiles').update({ bio: bio || null, age: age ? parseInt(age) : null }).eq('user_id', currentUserId);
     setLoading(false);
-    alert('تم حفظ الملف الشخصي');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
   };
 
   const genderLabel = (g: string | null) => {
@@ -46,38 +34,46 @@ export default function ProfilePage() {
     return 'غير محدد';
   };
 
-  return (
-    <div className="flex flex-col items-center gap-4 py-4">
-      <div className="w-24 h-24 rounded-full bg-secondary overflow-hidden">
-        {profile?.avatar_url && <img src={profile.avatar_url} className="w-full h-full object-cover" alt="صورة" />}
-      </div>
+  const getInitial = (name: string) => name?.charAt(0) || '?';
 
-      <div className="w-full max-w-sm space-y-3">
-        <input
-          className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-          placeholder="نبذة عنك"
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-        />
-        <input
-          className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-          placeholder="العمر"
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-        />
-        <button disabled={loading} onClick={handleSave} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95 disabled:opacity-50">
-          {loading ? 'جاري الحفظ...' : 'حفظ التغييرات'}
-        </button>
+  return (
+    <div className="flex flex-col items-center gap-5 py-4" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="w-24 h-24 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-3xl font-bold shadow-lg">
+        {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="صورة" /> : getInitial(profile?.username || '')}
       </div>
 
       {profile && (
-        <div className="text-muted-foreground text-sm text-center space-y-1 mt-4">
-          <p>الاسم: {profile.username}</p>
-          <p>النوع: {genderLabel(profile.gender)}</p>
-          <p>العمر: {profile.age || 'غير محدد'}</p>
-          <p>المستوى: {profile.level}</p>
+        <div className="text-center">
+          <h3 className="font-bold text-lg">{profile.username}</h3>
+          <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground mt-1">
+            <span>{genderLabel(profile.gender)}</span>
+            <span>·</span>
+            <span>{profile.age ? `${profile.age} سنة` : 'العمر غير محدد'}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <span className="online-dot active" />
+              متصل
+            </span>
+          </div>
+          <div className="mt-2 bg-primary/10 text-primary text-xs px-3 py-1 rounded-lg inline-block">
+            المستوى {profile.level}
+          </div>
         </div>
       )}
+
+      <div className="w-full max-w-sm space-y-3 mt-2">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1.5 block">نبذة عنك</label>
+          <input className="input-field" placeholder="اكتب نبذة قصيرة..." value={bio} onChange={(e) => setBio(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1.5 block">العمر</label>
+          <input className="input-field" type="number" placeholder="العمر" value={age} onChange={(e) => setAge(e.target.value)} />
+        </div>
+        <button disabled={loading} onClick={handleSave} className="w-full btn-primary">
+          {loading ? 'جاري الحفظ...' : saved ? '✓ تم الحفظ' : 'حفظ التغييرات'}
+        </button>
+      </div>
     </div>
   );
 }
