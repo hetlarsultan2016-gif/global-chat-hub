@@ -8,7 +8,6 @@ interface PrivateMsg {
   receiver_id: string;
   text: string;
   created_at: string;
-  sender_profile?: { username: string } | null;
 }
 
 export default function PrivateChatPage() {
@@ -20,10 +19,7 @@ export default function PrivateChatPage() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('user_id, username')
-        .neq('user_id', currentUserId || '');
+      const { data } = await supabase.from('profiles').select('user_id, username').neq('user_id', currentUserId || '');
       if (data) setUsers(data);
     };
     fetchUsers();
@@ -42,18 +38,10 @@ export default function PrivateChatPage() {
   useEffect(() => {
     loadMessages();
     if (!selectedPrivateUserId) return;
-
     const channel = supabase
       .channel(`pm-${currentUserId}-${selectedPrivateUserId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'private_messages',
-      }, () => {
-        loadMessages();
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, () => loadMessages())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [selectedPrivateUserId, currentUserId]);
 
@@ -65,31 +53,32 @@ export default function PrivateChatPage() {
     if (!text.trim() || !currentUserId || !selectedPrivateUserId) return;
     const msg = text;
     setText('');
-    await supabase.from('private_messages').insert({
-      sender_id: currentUserId,
-      receiver_id: selectedPrivateUserId,
-      text: msg,
-    });
+    await supabase.from('private_messages').insert({ sender_id: currentUserId, receiver_id: selectedPrivateUserId, text: msg });
   };
 
   const getSenderName = (senderId: string) => {
     if (senderId === currentUserId) return 'أنت';
-    const u = users.find(x => x.user_id === senderId);
-    return u?.username || 'مجهول';
+    return users.find(x => x.user_id === senderId)?.username || 'مجهول';
   };
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const selectedUsername = users.find(u => u.user_id === selectedPrivateUserId)?.username;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-lg">📩</span>
+        <h2 className="font-bold text-base">الرسائل الخاصة</h2>
+      </div>
+
       <select
-        className="chat-input-group w-full bg-card border-border text-foreground mb-3"
+        className="input-field mb-3"
         value={selectedPrivateUserId}
         onChange={(e) => setSelectedPrivateUserId(e.target.value)}
       >
-        <option value="">اختر العضو</option>
+        <option value="">اختر العضو للمحادثة</option>
         {users.map((u) => (
           <option key={u.user_id} value={u.user_id}>{u.username}</option>
         ))}
@@ -97,40 +86,48 @@ export default function PrivateChatPage() {
 
       {selectedPrivateUserId ? (
         <div className="flex flex-col flex-1 min-h-0">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 border border-border rounded-2xl bg-background mb-3">
-            {messages.length === 0 && (
-              <p className="text-center text-muted-foreground text-sm py-8">لا توجد رسائل بعد...</p>
-            )}
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`message-bubble max-w-[85%] px-4 py-2.5 text-sm ${
-                  m.sender_id === currentUserId ? 'message-sent self-end ml-auto' : 'message-received self-start mr-auto'
-                }`}
-              >
-                <span className="font-semibold text-xs opacity-80 block mb-1">{getSenderName(m.sender_id)}</span>
-                <span>{m.text}</span>
-                <div className="text-[10px] opacity-50 mt-1 text-left">{formatTime(m.created_at)}</div>
+          {selectedUsername && (
+            <div className="bg-card/50 rounded-xl px-3 py-2 mb-2 border border-border flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold">
+                {selectedUsername.charAt(0)}
               </div>
-            ))}
+              <span className="text-sm font-semibold">{selectedUsername}</span>
+            </div>
+          )}
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
+            {messages.length === 0 && (
+              <p className="text-center text-muted-foreground text-sm py-12 opacity-60">لا توجد رسائل بعد...</p>
+            )}
+            {messages.map((m) => {
+              const isMine = m.sender_id === currentUserId;
+              return (
+                <div key={m.id} className={`message-bubble max-w-[80%] ${isMine ? 'mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
+                  <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
+                    {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{getSenderName(m.sender_id)}</span>}
+                    <span className="leading-relaxed">{m.text}</span>
+                    <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
           <div className="chat-input-group">
             <input
               className="flex-1 bg-transparent border-none outline-none text-foreground text-sm placeholder:text-muted-foreground"
-              placeholder="اكتب رسالتك هنا..."
+              placeholder="اكتب رسالتك..."
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
             />
-            <button onClick={handleSend} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95">
+            <button onClick={handleSend} disabled={!text.trim()} className="btn-primary px-4 py-2 disabled:opacity-30 disabled:shadow-none">
               إرسال
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          اختر عضواً لبدء المحادثة
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-60 gap-2">
+          <span className="text-4xl">📩</span>
+          <span className="text-sm">اختر عضواً لبدء المحادثة</span>
         </div>
       )}
     </div>

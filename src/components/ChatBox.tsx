@@ -15,7 +15,7 @@ interface MessageWithProfile {
   profiles: { username: string; avatar_url: string | null } | null;
 }
 
-const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪'];
+const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪', '🥰', '😢'];
 
 export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
   const { currentUserId } = useChatStore();
@@ -36,19 +36,10 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
 
   useEffect(() => {
     loadMessages();
-
     const channel = supabase
       .channel(`room-${roomId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `room_id=eq.${roomId}`,
-      }, () => {
-        loadMessages();
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, () => loadMessages())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [roomId]);
 
@@ -60,47 +51,43 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     if (!text.trim() || !currentUserId) return;
     const msg = text;
     setText('');
-    await supabase.from('messages').insert({
-      room_id: roomId,
-      user_id: currentUserId,
-      text: msg,
-    });
+    await supabase.from('messages').insert({ room_id: roomId, user_id: currentUserId, text: msg });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSend();
-  };
+  const formatTime = (dateStr: string) =>
+    new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const getInitial = (name: string) => name?.charAt(0) || '?';
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 border border-border rounded-2xl bg-background mb-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
         {messages.length === 0 && (
-          <p className="text-center text-muted-foreground text-sm py-8">لا توجد رسائل بعد...</p>
+          <p className="text-center text-muted-foreground text-sm py-12 opacity-60">لا توجد رسائل بعد...</p>
         )}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`message-bubble max-w-[85%] px-4 py-2.5 text-sm ${
-              m.user_id === currentUserId ? 'message-sent self-end ml-auto' : 'message-received self-start mr-auto'
-            }`}
-          >
-            <span className="font-semibold text-xs opacity-80 block mb-1">
-              {m.profiles?.username || 'مجهول'}
-            </span>
-            <span>{m.text}</span>
-            <div className="text-[10px] opacity-50 mt-1 text-left">{formatTime(m.created_at)}</div>
-          </div>
-        ))}
+        {messages.map((m) => {
+          const isMine = m.user_id === currentUserId;
+          return (
+            <div key={m.id} className={`message-bubble max-w-[80%] flex gap-2 ${isMine ? 'flex-row-reverse mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
+              {!isMine && (
+                <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1">
+                  {getInitial(m.profiles?.username || '')}
+                </div>
+              )}
+              <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
+                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.profiles?.username || 'مجهول'}</span>}
+                <span className="leading-relaxed">{m.text}</span>
+                <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {showEmojis && (
-        <div className="flex gap-1 mb-2 flex-wrap">
+        <div className="flex gap-1 mb-2 flex-wrap px-1" style={{ animation: 'slideUp 0.2s ease' }}>
           {EMOJIS.map((e) => (
-            <button key={e} onClick={() => setText(text + e)} className="text-lg bg-transparent hover:bg-secondary rounded-lg p-1 transition-all">
+            <button key={e} onClick={() => setText(text + e)} className="text-lg hover:bg-secondary rounded-lg p-1.5 transition-colors active:scale-90">
               {e}
             </button>
           ))}
@@ -110,17 +97,17 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
       <div className="chat-input-group">
         <input
           className="flex-1 bg-transparent border-none outline-none text-foreground text-sm placeholder:text-muted-foreground"
-          placeholder="اكتب رسالتك هنا..."
+          placeholder="اكتب رسالتك..."
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
         />
         {showEmoji && (
-          <button onClick={() => setShowEmojis(!showEmojis)} className="bg-transparent text-muted-foreground hover:text-foreground p-1 text-lg">
+          <button onClick={() => setShowEmojis(!showEmojis)} className={`text-lg p-1 rounded-lg transition-colors ${showEmojis ? 'bg-primary/15' : 'hover:bg-secondary'}`}>
             😊
           </button>
         )}
-        <button onClick={handleSend} className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-semibold text-sm transition-all active:scale-95">
+        <button onClick={handleSend} disabled={!text.trim()} className="btn-primary px-4 py-2 disabled:opacity-30 disabled:shadow-none">
           إرسال
         </button>
       </div>

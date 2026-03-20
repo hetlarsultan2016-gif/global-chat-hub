@@ -8,10 +8,12 @@ import PrivateChatPage from '@/components/PrivateChatPage';
 import ProfilePage from '@/components/ProfilePage';
 import OnlineUsers from '@/components/OnlineUsers';
 import CountriesPage from '@/components/CountriesPage';
+import RoomsPage from '@/components/RoomsPage';
 
 const NAV_ITEMS = [
   { id: 'public', icon: '💬', label: 'عام' },
   { id: 'dating', icon: '❤️', label: 'تعارف' },
+  { id: 'rooms', icon: '🏠', label: 'الغرف' },
   { id: 'countries', icon: '🌎', label: 'الدول' },
   { id: 'private', icon: '📩', label: 'رسائل' },
   { id: 'online', icon: '👥', label: 'أعضاء' },
@@ -21,6 +23,7 @@ const NAV_ITEMS = [
 const PAGES: Record<string, React.FC> = {
   public: PublicChatPage,
   dating: DatingChatPage,
+  rooms: RoomsPage,
   countries: CountriesPage,
   private: PrivateChatPage,
   online: OnlineUsers,
@@ -30,18 +33,12 @@ const PAGES: Record<string, React.FC> = {
 export default function Index() {
   const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser } = useChatStore();
 
-  // Listen for auth state changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('user_id', session.user.id)
-          .single();
+        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
         setCurrentUser(session.user.id, profile?.username || 'مستخدم');
         if (activePage === 'login') setActivePage('public');
-        // Mark online
         await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
       } else {
         setCurrentUser(null, null);
@@ -49,14 +46,9 @@ export default function Index() {
       }
     });
 
-    // Check existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('user_id', session.user.id)
-          .single();
+        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
         setCurrentUser(session.user.id, profile?.username || 'مستخدم');
         setActivePage('public');
         await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
@@ -66,16 +58,12 @@ export default function Index() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (!currentUserId || activePage === 'login') {
-    return <LoginPage />;
-  }
+  if (!currentUserId || activePage === 'login') return <LoginPage />;
 
   const PageComponent = PAGES[activePage] || PublicChatPage;
 
   const handleLogout = async () => {
-    if (currentUserId) {
-      await supabase.from('profiles').update({ is_online: false }).eq('user_id', currentUserId);
-    }
+    if (currentUserId) await supabase.from('profiles').update({ is_online: false }).eq('user_id', currentUserId);
     await supabase.auth.signOut();
     setCurrentUser(null, null);
     setActivePage('login');
@@ -83,29 +71,42 @@ export default function Index() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" dir="rtl">
-      <header className="glass-header border-b border-border px-4 py-3 text-center font-bold text-lg z-50 flex items-center justify-between">
-        <span className="text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors" onClick={handleLogout}>
+      {/* Header */}
+      <header className="glass-header px-4 py-3 z-50 flex items-center justify-between">
+        <button onClick={handleLogout} className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-lg hover:bg-destructive/10">
           خروج
-        </span>
-        <span>🌍 الدردشة العالمية</span>
-        <span className="text-xs text-muted-foreground">{currentUsername}</span>
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🌍</span>
+          <span className="font-bold text-sm">الدردشة العالمية</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="online-dot active" />
+          <span className="text-xs text-muted-foreground">{currentUsername}</span>
+        </div>
       </header>
 
-      <nav className="flex justify-around bg-card border-b border-border px-2 py-1 overflow-x-auto z-40">
+      {/* Navigation */}
+      <nav className="flex bg-card/80 backdrop-blur-sm border-b border-border px-1 py-1 overflow-x-auto z-40 gap-0.5" style={{ scrollbarWidth: 'none' }}>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
-            className={`nav-item-chat min-w-[50px] ${activePage === item.id ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+            className={`nav-item-chat min-w-[44px] flex-shrink-0 ${
+              activePage === item.id
+                ? 'bg-primary/15 text-primary'
+                : 'text-muted-foreground'
+            }`}
           >
-            <span className="text-lg">{item.icon}</span>
-            <span className="text-[10px]">{item.label}</span>
+            <span className="text-base">{item.icon}</span>
+            <span className="text-[10px] font-medium">{item.label}</span>
           </button>
         ))}
       </nav>
 
-      <main className="flex-1 overflow-y-auto p-4 min-h-0">
-        <div className="h-full flex flex-col">
+      {/* Content */}
+      <main className="flex-1 overflow-y-auto min-h-0">
+        <div className="h-full flex flex-col p-3">
           <PageComponent />
         </div>
       </main>

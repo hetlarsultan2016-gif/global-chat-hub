@@ -10,150 +10,117 @@ export default function LoginPage() {
   const [gender, setGender] = useState('');
   const [age, setAge] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
-    if (!username || !password) return alert('أدخل اسم المستخدم وكلمة المرور');
+    if (!username || !password) { setError('أدخل اسم المستخدم وكلمة المرور'); return; }
     setLoading(true);
+    setError('');
     try {
       const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        alert('خطأ في البيانات: ' + error.message);
-        return;
-      }
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); return; }
       if (data.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('user_id', data.user.id)
-          .single();
+        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', data.user.id).single();
         setCurrentUser(data.user.id, profile?.username || username);
         setActivePage('public');
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleRegister = async () => {
-    if (!username || !password || !gender || !age) return alert('اكمل جميع البيانات');
+    if (!username || !password || !gender || !age) { setError('أكمل جميع البيانات'); return; }
+    if (password.length < 6) { setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return; }
     setLoading(true);
+    setError('');
     try {
       const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { username, age: parseInt(age), gender: genderValue },
-        },
+      const { data, error: authError } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { username, age: parseInt(age), gender: genderValue } },
       });
-      if (error) {
-        if (error.message.includes('already registered')) {
-          alert('اسم المستخدم موجود');
-        } else {
-          alert('خطأ: ' + error.message);
-        }
+      if (authError) {
+        setError(authError.message.includes('already registered') ? 'اسم المستخدم مستخدم بالفعل' : 'حدث خطأ، حاول مرة أخرى');
         return;
       }
       if (data.user) {
-        alert('تم إنشاء الحساب بنجاح');
         setCurrentUser(data.user.id, username);
         setActivePage('public');
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleGuest = async () => {
     setLoading(true);
+    setError('');
     try {
       const guestName = 'زائر_' + Math.random().toString(36).substring(2, 7);
       const email = `${guestName}@chat.app`;
       const guestPass = 'guest_' + Math.random().toString(36).substring(2, 12);
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: guestPass,
+      const { data, error: authError } = await supabase.auth.signUp({
+        email, password: guestPass,
         options: { data: { username: 'زائر', gender: null, age: null } },
       });
-      if (error) {
-        alert('خطأ في الدخول كزائر');
-        return;
-      }
-      if (data.user) {
-        setCurrentUser(data.user.id, 'زائر');
-        setActivePage('public');
-      }
-    } finally {
-      setLoading(false);
-    }
+      if (authError) { setError('حدث خطأ، حاول مرة أخرى'); return; }
+      if (data.user) { setCurrentUser(data.user.id, 'زائر'); setActivePage('public'); }
+    } finally { setLoading(false); }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">🌍</h1>
-          <h2 className="text-xl font-bold">{isRegister ? 'إنشاء حساب' : 'مرحباً بك'}</h2>
-          <p className="text-muted-foreground text-sm mt-1">الدردشة العالمية</p>
+    <div className="flex min-h-screen items-center justify-center p-6" dir="rtl">
+      <div className="w-full max-w-sm" style={{ animation: 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 rounded-3xl bg-secondary mx-auto flex items-center justify-center text-4xl mb-4 shadow-lg">
+            🌍
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">الدردشة العالمية</h1>
+          <p className="text-muted-foreground text-sm mt-2">
+            {isRegister ? 'أنشئ حسابك وانضم إلينا' : 'سجل دخولك وابدأ الدردشة'}
+          </p>
         </div>
 
-        <div className="space-y-3">
-          <input
-            className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-            placeholder="اسم المستخدم"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <input
-            className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-            type="password"
-            placeholder="كلمة المرور"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl px-4 py-3 mb-4 text-center">
+            {error}
+          </div>
+        )}
 
+        <div className="space-y-3 mb-6">
+          <input className="input-field" placeholder="اسم المستخدم" value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input className="input-field" type="password" placeholder="كلمة المرور" value={password} onChange={(e) => setPassword(e.target.value)} />
           {isRegister && (
             <>
-              <select
-                className="chat-input-group w-full bg-card border-border text-foreground"
-                value={gender}
-                onChange={(e) => setGender(e.target.value)}
-              >
-                <option value="">النوع</option>
+              <select className="input-field" value={gender} onChange={(e) => setGender(e.target.value)}>
+                <option value="">اختر النوع</option>
                 <option value="ذكر">ذكر</option>
                 <option value="أنثى">أنثى</option>
               </select>
-              <input
-                className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-                placeholder="العمر"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-              />
+              <input className="input-field" type="number" placeholder="العمر" value={age} onChange={(e) => setAge(e.target.value)} />
             </>
           )}
         </div>
 
         {isRegister ? (
           <div className="space-y-3">
-            <button disabled={loading} onClick={handleRegister} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95 disabled:opacity-50">
+            <button disabled={loading} onClick={handleRegister} className="w-full btn-primary">
               {loading ? 'جاري التحميل...' : 'إنشاء الحساب'}
             </button>
-            <button onClick={() => setIsRegister(false)} className="w-full bg-secondary text-secondary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95">
-              لديك حساب؟ تسجيل الدخول
+            <button onClick={() => { setIsRegister(false); setError(''); }} className="w-full btn-secondary">
+              لديك حساب؟ سجل دخولك
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <button disabled={loading} onClick={handleLogin} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95 disabled:opacity-50">
-              {loading ? 'جاري التحميل...' : 'دخول'}
+            <button disabled={loading} onClick={handleLogin} className="w-full btn-primary">
+              {loading ? 'جاري التحميل...' : 'تسجيل الدخول'}
             </button>
-            <button disabled={loading} onClick={handleGuest} className="w-full bg-secondary text-secondary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95 disabled:opacity-50">
+            <button disabled={loading} onClick={handleGuest} className="w-full btn-secondary">
               الدخول كزائر
             </button>
-            <p onClick={() => setIsRegister(true)} className="text-center text-muted-foreground cursor-pointer hover:text-foreground transition-colors text-sm">
-              إنشاء حساب جديد
+            <p onClick={() => { setIsRegister(true); setError(''); }}
+               className="text-center text-muted-foreground cursor-pointer hover:text-foreground transition-colors text-sm pt-2">
+              ليس لديك حساب؟ أنشئ حساباً جديداً
             </p>
           </div>
         )}

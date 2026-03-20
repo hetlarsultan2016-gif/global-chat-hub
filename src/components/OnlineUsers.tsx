@@ -31,9 +31,8 @@ export default function OnlineUsers() {
     return () => clearInterval(interval);
   }, [currentUserId]);
 
-  const filtered = users.filter((u) =>
-    u.username.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
+  const onlineCount = users.filter(u => u.is_online).length;
 
   const startChat = () => {
     if (!selectedModal) return;
@@ -48,55 +47,60 @@ export default function OnlineUsers() {
     return '';
   };
 
+  const getInitial = (name: string) => name?.charAt(0) || '?';
+
   return (
-    <div className="space-y-3">
-      <input
-        className="chat-input-group w-full bg-card border-border text-foreground placeholder:text-muted-foreground"
-        placeholder="بحث بين الأعضاء..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
-      <div className="space-y-2">
+    <div className="space-y-3" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-lg">👥</span>
+        <h2 className="font-bold text-base">الأعضاء</h2>
+        <span className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-lg mr-auto">
+          {onlineCount} متصل
+        </span>
+      </div>
+
+      <input className="input-field" placeholder="ابحث عن عضو..." value={search} onChange={(e) => setSearch(e.target.value)} />
+
+      <div className="space-y-1.5">
         {filtered.map((u) => (
           <div
             key={u.user_id}
             onClick={() => setSelectedModal(u)}
-            className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border cursor-pointer hover:bg-secondary transition-all"
+            className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border cursor-pointer hover:bg-secondary transition-all active:scale-[0.98]"
           >
-            <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex-shrink-0">
-              {u.avatar_url && <img src={u.avatar_url} className="w-full h-full object-cover" alt="" />}
+            <div className="w-10 h-10 rounded-full bg-secondary overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold">
+              {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(u.username)}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{u.username}</p>
-              <p className="text-xs text-muted-foreground">{genderLabel(u.gender)} {u.age ? `· ${u.age} سنة` : ''}</p>
+              <p className="text-[11px] text-muted-foreground">{genderLabel(u.gender)} {u.age ? `· ${u.age} سنة` : ''}</p>
             </div>
-            <span className={`text-xs ${u.is_online ? 'text-primary' : 'text-muted-foreground'}`}>
-              {u.is_online ? 'متصل' : 'غير متصل'}
-            </span>
+            <span className={`online-dot ${u.is_online ? 'active' : 'inactive'}`} />
           </div>
         ))}
         {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground text-sm py-8">لا يوجد أعضاء</p>
+          <p className="text-center text-muted-foreground text-sm py-8 opacity-60">لا يوجد أعضاء</p>
         )}
       </div>
 
       {selectedModal && (
         <div className="modal-overlay" onClick={() => setSelectedModal(null)}>
-          <div className="bg-card p-6 rounded-2xl border border-border w-[90%] max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-card p-6 rounded-2xl border border-border w-[90%] max-w-sm space-y-4" onClick={(e) => e.stopPropagation()}
+               style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
             <div className="flex flex-col items-center gap-3">
-              <div className="w-20 h-20 rounded-full bg-secondary overflow-hidden">
-                {selectedModal.avatar_url && <img src={selectedModal.avatar_url} className="w-full h-full object-cover" alt="" />}
+              <div className="w-20 h-20 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-2xl font-bold">
+                {selectedModal.avatar_url ? <img src={selectedModal.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(selectedModal.username)}
               </div>
               <h3 className="font-bold text-lg">{selectedModal.username}</h3>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className={`online-dot ${selectedModal.is_online ? 'active' : 'inactive'}`} />
+                <span>{selectedModal.is_online ? 'متصل الآن' : 'غير متصل'}</span>
+              </div>
               <p className="text-muted-foreground text-sm">{genderLabel(selectedModal.gender)} {selectedModal.age ? `· ${selectedModal.age} سنة` : ''}</p>
-              {selectedModal.bio && <p className="text-primary text-sm">{selectedModal.bio}</p>}
+              {selectedModal.bio && <p className="text-primary text-sm text-center">{selectedModal.bio}</p>}
             </div>
-            <button onClick={startChat} className="w-full bg-primary text-primary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95">
-              مراسلة خاصة
-            </button>
-            <button onClick={() => setSelectedModal(null)} className="w-full bg-secondary text-secondary-foreground py-3 rounded-xl font-semibold transition-all active:scale-95">
-              إغلاق
-            </button>
+            <button onClick={startChat} className="w-full btn-primary">مراسلة خاصة</button>
+            <button onClick={() => setSelectedModal(null)} className="w-full btn-secondary">إغلاق</button>
           </div>
         </div>
       )}
