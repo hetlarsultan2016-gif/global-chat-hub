@@ -25,14 +25,13 @@ export default function LoginPage() {
     setError('');
     try {
       const email = toAsciiEmail(username);
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); return; }
-      if (data.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', data.user.id).single();
-        setCurrentUser(data.user.id, profile?.username || username);
-        setActivePage('public');
-      }
-    } finally { setLoading(false); }
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); setLoading(false); return; }
+      // onAuthStateChange in Index.tsx will handle navigation
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   const handleRegister = async () => {
