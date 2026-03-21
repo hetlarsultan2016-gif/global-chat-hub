@@ -36,7 +36,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-  };
 
   const handleRegister = async () => {
     if (!username || !password || !gender || !age) { setError('أكمل جميع البيانات'); return; }
