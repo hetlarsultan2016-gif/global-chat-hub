@@ -42,19 +42,19 @@ export default function LoginPage() {
     try {
       const email = toAsciiEmail(username);
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
-      const { data, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email, password,
         options: { data: { username, age: parseInt(age), gender: genderValue } },
       });
       if (authError) {
         setError(authError.message.includes('already registered') ? 'اسم المستخدم مستخدم بالفعل' : 'حدث خطأ، حاول مرة أخرى');
+        setLoading(false);
         return;
       }
-      if (data.user) {
-        setCurrentUser(data.user.id, username);
-        setActivePage('public');
-      }
-    } finally { setLoading(false); }
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   const handleGuest = async () => {
@@ -64,13 +64,15 @@ export default function LoginPage() {
       const guestId = Math.random().toString(36).substring(2, 9);
       const email = `guest_${guestId}@chat.app`;
       const guestPass = 'guest_' + Math.random().toString(36).substring(2, 12);
-      const { data, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email, password: guestPass,
         options: { data: { username: 'زائر', gender: null, age: null } },
       });
-      if (authError) { setError('حدث خطأ، حاول مرة أخرى'); return; }
-      if (data.user) { setCurrentUser(data.user.id, 'زائر'); setActivePage('public'); }
-    } finally { setLoading(false); }
+      if (authError) { setError('حدث خطأ، حاول مرة أخرى'); setLoading(false); return; }
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   return (
