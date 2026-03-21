@@ -62,8 +62,8 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const guestName = 'زائر_' + Math.random().toString(36).substring(2, 7);
-      const email = `${guestName}@chat.app`;
+      const guestId = Math.random().toString(36).substring(2, 9);
+      const email = `guest_${guestId}@chat.app`;
       const guestPass = 'guest_' + Math.random().toString(36).substring(2, 12);
       const { data, error: authError } = await supabase.auth.signUp({
         email, password: guestPass,
