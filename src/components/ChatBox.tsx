@@ -101,7 +101,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
                 </div>
               )}
               <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
-                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.profiles?.username || 'مجهول'}</span>}
+                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.username}</span>}
                 <span className="leading-relaxed">{m.text}</span>
                 <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
