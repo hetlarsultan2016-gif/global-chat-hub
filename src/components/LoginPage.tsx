@@ -41,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
+      const email = toAsciiEmail(username);
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
       const { data, error: authError } = await supabase.auth.signUp({
         email, password,
