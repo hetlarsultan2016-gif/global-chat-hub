@@ -46,7 +46,7 @@ export default function LoginPage() {
     try {
       const email = toAsciiEmail(username);
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
-      const { error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email, password,
         options: { data: { username, age: parseInt(age), gender: genderValue } },
       });
@@ -54,6 +54,10 @@ export default function LoginPage() {
         setError(authError.message.includes('already registered') ? 'اسم المستخدم مستخدم بالفعل' : 'حدث خطأ، حاول مرة أخرى');
         setLoading(false);
         return;
+      }
+      if (data.user) {
+        setCurrentUser(data.user.id, username);
+        setActivePage('public');
       }
     } catch {
       setError('حدث خطأ، حاول مرة أخرى');
