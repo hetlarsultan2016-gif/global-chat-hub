@@ -7,12 +7,16 @@ interface ChatBoxProps {
   showEmoji?: boolean;
 }
 
-interface MessageWithProfile {
+interface MessageRow {
   id: string;
   text: string;
   created_at: string;
   user_id: string;
-  profiles: { username: string; avatar_url: string | null } | null;
+}
+
+interface MessageWithProfile extends MessageRow {
+  username: string;
+  avatar_url: string | null;
 }
 
 const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪', '🥰', '😢'];
@@ -23,15 +27,37 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null }>>({});
 
   const loadMessages = async () => {
     const { data } = await supabase
       .from('messages')
-      .select('id, text, created_at, user_id, profiles(username, avatar_url)')
+      .select('id, text, created_at, user_id')
       .eq('room_id', roomId)
       .order('created_at', { ascending: true })
       .limit(100);
-    if (data) setMessages(data as unknown as MessageWithProfile[]);
+    if (!data) return;
+
+    // Fetch profiles for unique user_ids not yet cached
+    const userIds = [...new Set(data.map(m => m.user_id))];
+    const uncached = userIds.filter(id => !profilesCache.current[id]);
+    if (uncached.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, username, avatar_url')
+        .in('user_id', uncached);
+      if (profiles) {
+        profiles.forEach(p => {
+          profilesCache.current[p.user_id] = { username: p.username, avatar_url: p.avatar_url };
+        });
+      }
+    }
+
+    setMessages(data.map(m => ({
+      ...m,
+      username: profilesCache.current[m.user_id]?.username || 'مجهول',
+      avatar_url: profilesCache.current[m.user_id]?.avatar_url || null,
+    })));
   };
 
   useEffect(() => {
@@ -71,11 +97,11 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
             <div key={m.id} className={`message-bubble max-w-[80%] flex gap-2 ${isMine ? 'flex-row-reverse mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
               {!isMine && (
                 <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1">
-                  {getInitial(m.profiles?.username || '')}
+                  {getInitial(m.username)}
                 </div>
               )}
               <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
-                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.profiles?.username || 'مجهول'}</span>}
+                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.username}</span>}
                 <span className="leading-relaxed">{m.text}</span>
                 <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>

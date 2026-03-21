@@ -12,20 +12,29 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const toAsciiEmail = (name: string) => {
+    const ascii = Array.from(name.toLowerCase().replace(/\s+/g, '_'))
+      .map(c => c.charCodeAt(0) > 127 ? c.charCodeAt(0).toString(36) : c)
+      .join('');
+    return `${ascii}@chat.app`;
+  };
+
   const handleLogin = async () => {
     if (!username || !password) { setError('أدخل اسم المستخدم وكلمة المرور'); return; }
     setLoading(true);
     setError('');
     try {
-      const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
+      const email = toAsciiEmail(username);
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); return; }
+      if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); setLoading(false); return; }
       if (data.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', data.user.id).single();
-        setCurrentUser(data.user.id, profile?.username || username);
+        setCurrentUser(data.user.id, username);
         setActivePage('public');
       }
-    } finally { setLoading(false); }
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   const handleRegister = async () => {
@@ -34,7 +43,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
+      const email = toAsciiEmail(username);
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
       const { data, error: authError } = await supabase.auth.signUp({
         email, password,
@@ -42,29 +51,36 @@ export default function LoginPage() {
       });
       if (authError) {
         setError(authError.message.includes('already registered') ? 'اسم المستخدم مستخدم بالفعل' : 'حدث خطأ، حاول مرة أخرى');
+        setLoading(false);
         return;
       }
       if (data.user) {
         setCurrentUser(data.user.id, username);
         setActivePage('public');
       }
-    } finally { setLoading(false); }
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   const handleGuest = async () => {
     setLoading(true);
     setError('');
     try {
-      const guestName = 'زائر_' + Math.random().toString(36).substring(2, 7);
-      const email = `${guestName}@chat.app`;
+      const guestId = Math.random().toString(36).substring(2, 9);
+      const email = `guest_${guestId}@chat.app`;
       const guestPass = 'guest_' + Math.random().toString(36).substring(2, 12);
       const { data, error: authError } = await supabase.auth.signUp({
         email, password: guestPass,
         options: { data: { username: 'زائر', gender: null, age: null } },
       });
-      if (authError) { setError('حدث خطأ، حاول مرة أخرى'); return; }
+      if (authError) { setError('حدث خطأ، حاول مرة أخرى'); setLoading(false); return; }
       if (data.user) { setCurrentUser(data.user.id, 'زائر'); setActivePage('public'); }
-    } finally { setLoading(false); }
+    } catch {
+      setError('حدث خطأ، حاول مرة أخرى');
+      setLoading(false);
+    }
   };
 
   return (
