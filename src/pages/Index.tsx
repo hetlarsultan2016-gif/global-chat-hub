@@ -37,20 +37,23 @@ export default function Index() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
-        setCurrentUser(session.user.id, profile?.username || 'مستخدم');
-        if (activePage === 'login') setActivePage('public');
+        const store = useChatStore.getState();
+        store.setCurrentUser(session.user.id, profile?.username || 'مستخدم');
+        store.setActivePage('public');
         await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
       } else {
-        setCurrentUser(null, null);
-        setActivePage('login');
+        const store = useChatStore.getState();
+        store.setCurrentUser(null, null);
+        store.setActivePage('login');
       }
     });
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
-        setCurrentUser(session.user.id, profile?.username || 'مستخدم');
-        setActivePage('public');
+        const store = useChatStore.getState();
+        store.setCurrentUser(session.user.id, profile?.username || 'مستخدم');
+        store.setActivePage('public');
         await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
       }
     });
