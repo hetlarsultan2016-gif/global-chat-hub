@@ -12,12 +12,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const toAsciiEmail = (name: string) => {
+    const ascii = Array.from(name.toLowerCase().replace(/\s+/g, '_'))
+      .map(c => c.charCodeAt(0) > 127 ? c.charCodeAt(0).toString(36) : c)
+      .join('');
+    return `${ascii}@chat.app`;
+  };
+
   const handleLogin = async () => {
     if (!username || !password) { setError('أدخل اسم المستخدم وكلمة المرور'); return; }
     setLoading(true);
     setError('');
     try {
-      const email = `${username.toLowerCase().replace(/\s+/g, '_')}@chat.app`;
+      const email = toAsciiEmail(username);
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError('اسم المستخدم أو كلمة المرور غير صحيحة'); return; }
       if (data.user) {
