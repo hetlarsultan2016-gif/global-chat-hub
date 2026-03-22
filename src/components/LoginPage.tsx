@@ -65,12 +65,12 @@ export default function LoginPage() {
       const guestId = Math.random().toString(36).substring(2, 9);
       const email = `guest_${guestId}@chat.app`;
       const guestPass = 'guest_' + Math.random().toString(36).substring(2, 12);
-      const { data, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email, password: guestPass,
         options: { data: { username: 'زائر', gender: null, age: null } },
       });
       if (authError) { setError('حدث خطأ، حاول مرة أخرى'); setLoading(false); return; }
-      if (data.user) { setCurrentUser(data.user.id, 'زائر'); setActivePage('public'); }
+      // onAuthStateChange in Index will handle state updates
     } catch {
       setError('حدث خطأ، حاول مرة أخرى');
       setLoading(false);
