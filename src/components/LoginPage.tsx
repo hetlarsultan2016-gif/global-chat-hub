@@ -42,7 +42,7 @@ export default function LoginPage() {
     try {
       const email = toAsciiEmail(username);
       const genderValue = gender === 'ذكر' ? 'male' : 'female';
-      const { data, error: authError } = await supabase.auth.signUp({
+      const { error: authError } = await supabase.auth.signUp({
         email, password,
         options: { data: { username, age: parseInt(age), gender: genderValue } },
       });
@@ -51,10 +51,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      if (data.user) {
-        setCurrentUser(data.user.id, username);
-        setActivePage('public');
-      }
+      // onAuthStateChange in Index will handle state updates
     } catch {
       setError('حدث خطأ، حاول مرة أخرى');
       setLoading(false);
