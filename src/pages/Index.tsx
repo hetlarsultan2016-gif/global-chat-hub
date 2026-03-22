@@ -35,10 +35,12 @@ export default function Index() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, !!session);
       if (session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
+        const { data: profile, error: profileError } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
+        console.log('Profile fetch result:', profile, profileError);
         const store = useChatStore.getState();
-        store.setCurrentUser(session.user.id, profile?.username || 'مستخدم');
+        store.setCurrentUser(session.user.id, profile?.username || session.user.user_metadata?.username || 'مستخدم');
         store.setActivePage('public');
         await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
       } else {
