@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -9,6 +9,8 @@ export default function ProfilePage() {
   const [age, setAge] = useState('');
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -18,6 +20,35 @@ export default function ProfilePage() {
     };
     fetchProfile();
   }, [currentUserId]);
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUserId) return;
+    
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const filePath = `${currentUserId}/avatar.${ext}`;
+      
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const avatarUrl = urlData.publicUrl + '?t=' + Date.now();
+      
+      // Update profile
+      await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('user_id', currentUserId);
+      setProfile((prev: any) => prev ? { ...prev, avatar_url: avatarUrl } : prev);
+    } catch (err) {
+      console.error('Upload error:', err);
+    }
+    setUploading(false);
+  };
 
   const handleSave = async () => {
     if (!currentUserId) return;
@@ -38,8 +69,18 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col items-center gap-5 py-4" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-      <div className="w-24 h-24 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-3xl font-bold shadow-lg">
-        {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="صورة" /> : getInitial(profile?.username || '')}
+      <div className="relative">
+        <div className="w-24 h-24 rounded-full bg-secondary overflow-hidden flex items-center justify-center text-3xl font-bold shadow-lg">
+          {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" alt="صورة" /> : getInitial(profile?.username || '')}
+        </div>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm shadow-lg hover:opacity-90 transition-opacity"
+        >
+          {uploading ? '⏳' : '📷'}
+        </button>
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
       </div>
 
       {profile && (
