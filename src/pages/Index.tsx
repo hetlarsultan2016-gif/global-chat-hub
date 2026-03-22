@@ -34,28 +34,27 @@ export default function Index() {
   const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser } = useChatStore();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const handleSession = (session: any) => {
       if (session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
+        const username = session.user.user_metadata?.username || 'مستخدم';
         const store = useChatStore.getState();
-        store.setCurrentUser(session.user.id, profile?.username || 'مستخدم');
-        store.setActivePage('public');
-        await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
+        store.setCurrentUser(session.user.id, username);
+        if (store.activePage === 'login') store.setActivePage('public');
+        // Update online status in background
+        supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id).then(() => {});
       } else {
         const store = useChatStore.getState();
         store.setCurrentUser(null, null);
         store.setActivePage('login');
       }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleSession(session);
     });
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: profile } = await supabase.from('profiles').select('username').eq('user_id', session.user.id).single();
-        const store = useChatStore.getState();
-        store.setCurrentUser(session.user.id, profile?.username || 'مستخدم');
-        store.setActivePage('public');
-        await supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id);
-      }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
     });
 
     return () => subscription.unsubscribe();
