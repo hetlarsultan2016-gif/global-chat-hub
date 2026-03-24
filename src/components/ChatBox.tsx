@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatStore } from '@/lib/chatStore';
+import UserActionMenu from './UserActionMenu';
 
 interface ChatBoxProps {
   roomId: string;
@@ -26,6 +27,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
+  const [actionMenu, setActionMenu] = useState<{ userId: string; username: string; avatarUrl: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null }>>({});
 
@@ -38,7 +40,6 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
       .limit(100);
     if (!data) return;
 
-    // Fetch profiles for unique user_ids not yet cached
     const userIds = [...new Set(data.map(m => m.user_id))];
     const uncached = userIds.filter(id => !profilesCache.current[id]);
     if (uncached.length > 0) {
@@ -85,6 +86,11 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
 
   const getInitial = (name: string) => name?.charAt(0) || '?';
 
+  const handleAvatarClick = (m: MessageWithProfile) => {
+    if (m.user_id === currentUserId) return;
+    setActionMenu({ userId: m.user_id, username: m.username, avatarUrl: m.avatar_url });
+  };
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
@@ -96,12 +102,22 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           return (
             <div key={m.id} className={`message-bubble max-w-[80%] flex gap-2 ${isMine ? 'flex-row-reverse mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
               {!isMine && (
-                <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1 overflow-hidden">
+                <div
+                  onClick={() => handleAvatarClick(m)}
+                  className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                >
                   {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(m.username)}
                 </div>
               )}
               <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
-                {!isMine && <span className="font-semibold text-xs opacity-70 block mb-0.5">{m.username}</span>}
+                {!isMine && (
+                  <span
+                    onClick={() => handleAvatarClick(m)}
+                    className="font-semibold text-xs opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity"
+                  >
+                    {m.username}
+                  </span>
+                )}
                 <span className="leading-relaxed">{m.text}</span>
                 <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
@@ -137,6 +153,15 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           إرسال
         </button>
       </div>
+
+      {actionMenu && (
+        <UserActionMenu
+          userId={actionMenu.userId}
+          username={actionMenu.username}
+          avatarUrl={actionMenu.avatarUrl}
+          onClose={() => setActionMenu(null)}
+        />
+      )}
     </div>
   );
 }
