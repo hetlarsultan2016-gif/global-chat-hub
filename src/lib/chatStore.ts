@@ -5,9 +5,14 @@ interface ChatStore {
   currentUsername: string | null;
   activePage: string;
   selectedPrivateUserId: string;
+  unreadCount: number;
   setCurrentUser: (id: string | null, username: string | null) => void;
   setActivePage: (page: string) => void;
   setSelectedPrivateUserId: (id: string) => void;
+  setUnreadCount: (count: number) => void;
+  // For viewing another user's profile
+  viewProfileUserId: string | null;
+  setViewProfileUserId: (id: string | null) => void;
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -15,7 +20,11 @@ export const useChatStore = create<ChatStore>((set) => ({
   currentUsername: null,
   activePage: 'login',
   selectedPrivateUserId: '',
+  unreadCount: 0,
+  viewProfileUserId: null,
   setCurrentUser: (id, username) => set({ currentUserId: id, currentUsername: username }),
   setActivePage: (page) => set({ activePage: page }),
   setSelectedPrivateUserId: (id) => set({ selectedPrivateUserId: id }),
+  setUnreadCount: (count) => set({ unreadCount: count }),
+  setViewProfileUserId: (id) => set({ viewProfileUserId: id }),
 }));

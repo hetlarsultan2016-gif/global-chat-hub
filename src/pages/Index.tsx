@@ -9,6 +9,7 @@ import ProfilePage from '@/components/ProfilePage';
 import OnlineUsers from '@/components/OnlineUsers';
 import CountriesPage from '@/components/CountriesPage';
 import RoomsPage from '@/components/RoomsPage';
+import ViewProfilePage from '@/components/ViewProfilePage';
 
 const NAV_ITEMS = [
   { id: 'public', icon: '💬', label: 'عام' },
@@ -28,10 +29,34 @@ const PAGES: Record<string, React.FC> = {
   private: PrivateChatPage,
   online: OnlineUsers,
   profile: ProfilePage,
+  viewProfile: ViewProfilePage,
 };
 
 export default function Index() {
-  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser } = useChatStore();
+  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser, unreadCount, setUnreadCount } = useChatStore();
+
+  // Fetch unread count
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const fetchUnread = async () => {
+      const { count } = await supabase
+        .from('private_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', currentUserId)
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    };
+
+    fetchUnread();
+
+    const channel = supabase
+      .channel(`unread-${currentUserId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => fetchUnread())
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUserId]);
 
   useEffect(() => {
     const handleSession = (session: any) => {
@@ -40,7 +65,6 @@ export default function Index() {
         const store = useChatStore.getState();
         store.setCurrentUser(session.user.id, username);
         if (store.activePage === 'login') store.setActivePage('public');
-        // Update online status in background
         supabase.from('profiles').update({ is_online: true }).eq('user_id', session.user.id).then(() => {});
       } else {
         const store = useChatStore.getState();
@@ -94,7 +118,7 @@ export default function Index() {
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
-            className={`nav-item-chat min-w-[44px] flex-shrink-0 ${
+            className={`nav-item-chat min-w-[44px] flex-shrink-0 relative ${
               activePage === item.id
                 ? 'bg-primary/15 text-primary'
                 : 'text-muted-foreground'
@@ -102,6 +126,11 @@ export default function Index() {
           >
             <span className="text-base">{item.icon}</span>
             <span className="text-[10px] font-medium">{item.label}</span>
+            {item.id === 'private' && unreadCount > 0 && (
+              <span className="absolute -top-0.5 -left-0.5 bg-destructive text-destructive-foreground text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-pulse">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>

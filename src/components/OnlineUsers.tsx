@@ -16,6 +16,8 @@ export default function OnlineUsers() {
   const { currentUserId, setSelectedPrivateUserId, setActivePage } = useChatStore();
   const [users, setUsers] = useState<Profile[]>([]);
   const [search, setSearch] = useState('');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedModal, setSelectedModal] = useState<Profile | null>(null);
 
   useEffect(() => {
@@ -31,7 +33,13 @@ export default function OnlineUsers() {
     return () => clearInterval(interval);
   }, [currentUserId]);
 
-  const filtered = users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
+  const filtered = users.filter((u) => {
+    if (!u.username.toLowerCase().includes(search.toLowerCase())) return false;
+    if (genderFilter !== 'all' && u.gender !== genderFilter) return false;
+    if (typeFilter === 'guest' && !u.username.startsWith('زائر_')) return false;
+    if (typeFilter === 'member' && u.username.startsWith('زائر_')) return false;
+    return true;
+  });
   const onlineCount = users.filter(u => u.is_online).length;
 
   const startChat = () => {
@@ -61,6 +69,28 @@ export default function OnlineUsers() {
 
       <input className="input-field" placeholder="ابحث عن عضو..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
+      {/* Filters */}
+      <div className="flex gap-2">
+        <select
+          className="input-field text-xs flex-1"
+          value={genderFilter}
+          onChange={(e) => setGenderFilter(e.target.value)}
+        >
+          <option value="all">الكل</option>
+          <option value="male">ذكر</option>
+          <option value="female">أنثى</option>
+        </select>
+        <select
+          className="input-field text-xs flex-1"
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+        >
+          <option value="all">الكل</option>
+          <option value="member">عضو</option>
+          <option value="guest">زائر</option>
+        </select>
+      </div>
+
       <div className="space-y-1.5">
         {filtered.map((u) => (
           <div
@@ -73,7 +103,10 @@ export default function OnlineUsers() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm truncate">{u.username}</p>
-              <p className="text-[11px] text-muted-foreground">{genderLabel(u.gender)} {u.age ? `· ${u.age} سنة` : ''}</p>
+              <p className="text-[11px] text-muted-foreground">
+                {genderLabel(u.gender)} {u.age ? `· ${u.age} سنة` : ''}
+                {u.username.startsWith('زائر_') ? ' · زائر' : ' · عضو'}
+              </p>
             </div>
             <span className={`online-dot ${u.is_online ? 'active' : 'inactive'}`} />
           </div>
