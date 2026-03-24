@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatStore } from '@/lib/chatStore';
 import UserActionMenu from './UserActionMenu';
@@ -8,14 +8,11 @@ interface ChatBoxProps {
   showEmoji?: boolean;
 }
 
-interface MessageRow {
+interface MessageWithProfile {
   id: string;
   text: string;
   created_at: string;
   user_id: string;
-}
-
-interface MessageWithProfile extends MessageRow {
   username: string;
   avatar_url: string | null;
 }
@@ -23,7 +20,7 @@ interface MessageWithProfile extends MessageRow {
 const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪', '🥰', '😢'];
 
 export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
-  const { currentUserId } = useChatStore();
+  const { currentUserId, currentUsername } = useChatStore();
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
@@ -31,7 +28,17 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null }>>({});
 
-  const loadMessages = async () => {
+  const resolveProfile = useCallback(async (userId: string) => {
+    if (profilesCache.current[userId]) return profilesCache.current[userId];
+    const { data } = await supabase.from('profiles').select('user_id, username, avatar_url').eq('user_id', userId).single();
+    if (data) {
+      profilesCache.current[data.user_id] = { username: data.username, avatar_url: data.avatar_url };
+      return profilesCache.current[data.user_id];
+    }
+    return { username: 'مجهول', avatar_url: null };
+  }, []);
+
+  const loadMessages = useCallback(async () => {
     const { data } = await supabase
       .from('messages')
       .select('id, text, created_at, user_id')
@@ -59,16 +66,52 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
       username: profilesCache.current[m.user_id]?.username || 'مجهول',
       avatar_url: profilesCache.current[m.user_id]?.avatar_url || null,
     })));
-  };
+  }, [roomId]);
 
   useEffect(() => {
     loadMessages();
     const channel = supabase
       .channel(`room-${roomId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${roomId}` }, () => loadMessages())
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `room_id=eq.${roomId}`
+      }, async (payload) => {
+        const newMsg = payload.new as any;
+        // Skip if it's our own optimistic message
+        if (newMsg.user_id === currentUserId) {
+          // Replace optimistic with real
+          setMessages(prev => {
+            const hasOptimistic = prev.some(m => m.id.startsWith('optimistic-'));
+            if (hasOptimistic) {
+              return prev.map(m =>
+                m.id.startsWith('optimistic-') && m.text === newMsg.text
+                  ? { ...m, id: newMsg.id, created_at: newMsg.created_at }
+                  : m
+              );
+            }
+            return prev;
+          });
+          return;
+        }
+        // For other users' messages, append directly
+        const profile = await resolveProfile(newMsg.user_id);
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, {
+            id: newMsg.id,
+            text: newMsg.text,
+            created_at: newMsg.created_at,
+            user_id: newMsg.user_id,
+            username: profile.username,
+            avatar_url: profile.avatar_url,
+          }];
+        });
+      })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [roomId]);
+  }, [roomId, currentUserId, loadMessages, resolveProfile]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -78,6 +121,19 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     if (!text.trim() || !currentUserId) return;
     const msg = text;
     setText('');
+
+    // Optimistic update - show message instantly
+    const optimisticId = `optimistic-${Date.now()}`;
+    const myProfile = profilesCache.current[currentUserId] || { username: currentUsername || 'أنت', avatar_url: null };
+    setMessages(prev => [...prev, {
+      id: optimisticId,
+      text: msg,
+      created_at: new Date().toISOString(),
+      user_id: currentUserId,
+      username: myProfile.username,
+      avatar_url: myProfile.avatar_url,
+    }]);
+
     await supabase.from('messages').insert({ room_id: roomId, user_id: currentUserId, text: msg });
   };
 

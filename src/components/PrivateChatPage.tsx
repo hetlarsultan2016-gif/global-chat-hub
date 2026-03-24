@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -22,14 +22,13 @@ interface ConversationUser {
 }
 
 export default function PrivateChatPage() {
-  const { currentUserId, selectedPrivateUserId, setSelectedPrivateUserId } = useChatStore();
+  const { currentUserId, currentUsername, selectedPrivateUserId, setSelectedPrivateUserId } = useChatStore();
   const [users, setUsers] = useState<{ user_id: string; username: string; avatar_url: string | null; is_online: boolean }[]>([]);
   const [conversations, setConversations] = useState<ConversationUser[]>([]);
   const [messages, setMessages] = useState<PrivateMsg[]>([]);
   const [text, setText] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load all users
   useEffect(() => {
     const fetchUsers = async () => {
       const { data } = await supabase.from('profiles').select('user_id, username, avatar_url, is_online').neq('user_id', currentUserId || '');
@@ -38,8 +37,7 @@ export default function PrivateChatPage() {
     fetchUsers();
   }, [currentUserId]);
 
-  // Load conversations (users who have exchanged messages with current user)
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
     if (!currentUserId) return;
     const { data: allMsgs } = await supabase
       .from('private_messages')
@@ -76,13 +74,13 @@ export default function PrivateChatPage() {
     });
 
     setConversations(convUsers);
-  };
+  }, [currentUserId, users]);
 
   useEffect(() => {
     if (users.length > 0) loadConversations();
-  }, [users, currentUserId]);
+  }, [users, currentUserId, loadConversations]);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async () => {
     if (!selectedPrivateUserId || !currentUserId) return;
     const { data } = await supabase
       .from('private_messages')
@@ -91,29 +89,48 @@ export default function PrivateChatPage() {
       .order('created_at', { ascending: true });
     if (data) {
       setMessages(data);
-      // Mark unread messages as read
       const unreadIds = data.filter((m: any) => m.receiver_id === currentUserId && !m.is_read).map((m: any) => m.id);
       if (unreadIds.length > 0) {
         await supabase.from('private_messages').update({ is_read: true } as any).in('id', unreadIds);
         loadConversations();
       }
     }
-  };
+  }, [selectedPrivateUserId, currentUserId, loadConversations]);
 
   useEffect(() => {
     loadMessages();
-    if (!selectedPrivateUserId) return;
+    if (!selectedPrivateUserId || !currentUserId) return;
     const channel = supabase
       .channel(`pm-${currentUserId}-${selectedPrivateUserId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, () => {
-        loadMessages();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
+        const newMsg = payload.new as any;
+        const isRelevant =
+          (newMsg.sender_id === currentUserId && newMsg.receiver_id === selectedPrivateUserId) ||
+          (newMsg.sender_id === selectedPrivateUserId && newMsg.receiver_id === currentUserId);
+        if (!isRelevant) return;
+
+        if (newMsg.sender_id === currentUserId) {
+          // Replace optimistic
+          setMessages(prev => prev.map(m =>
+            m.id.startsWith('optimistic-') && m.text === newMsg.text
+              ? { ...newMsg }
+              : m
+          ));
+        } else {
+          // Append incoming & mark as read
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMsg.id)) return prev;
+            return [...prev, newMsg];
+          });
+          supabase.from('private_messages').update({ is_read: true } as any).eq('id', newMsg.id).then(() => {});
+        }
         loadConversations();
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [selectedPrivateUserId, currentUserId]);
+  }, [selectedPrivateUserId, currentUserId, loadMessages, loadConversations]);
 
-  // Subscribe to all private messages for notifications
+  // Global notification channel
   useEffect(() => {
     if (!currentUserId) return;
     const channel = supabase
@@ -123,7 +140,7 @@ export default function PrivateChatPage() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentUserId, users]);
+  }, [currentUserId, loadConversations]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -133,6 +150,18 @@ export default function PrivateChatPage() {
     if (!text.trim() || !currentUserId || !selectedPrivateUserId) return;
     const msg = text;
     setText('');
+
+    // Optimistic update
+    const optimisticMsg: PrivateMsg = {
+      id: `optimistic-${Date.now()}`,
+      sender_id: currentUserId,
+      receiver_id: selectedPrivateUserId,
+      text: msg,
+      created_at: new Date().toISOString(),
+      is_read: false,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+
     await supabase.from('private_messages').insert({ sender_id: currentUserId, receiver_id: selectedPrivateUserId, text: msg });
   };
 
@@ -151,7 +180,6 @@ export default function PrivateChatPage() {
   const selectedUser = users.find(u => u.user_id === selectedPrivateUserId);
   const getInitial = (name: string) => name?.charAt(0) || '?';
 
-  // If no user selected, show conversations list
   if (!selectedPrivateUserId) {
     return (
       <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
@@ -160,11 +188,7 @@ export default function PrivateChatPage() {
           <h2 className="font-bold text-base">الرسائل الخاصة</h2>
         </div>
 
-        <select
-          className="input-field mb-3"
-          value=""
-          onChange={(e) => setSelectedPrivateUserId(e.target.value)}
-        >
+        <select className="input-field mb-3" value="" onChange={(e) => setSelectedPrivateUserId(e.target.value)}>
           <option value="">محادثة جديدة...</option>
           {users.map((u) => (
             <option key={u.user_id} value={u.user_id}>{u.username}</option>
@@ -214,11 +238,8 @@ export default function PrivateChatPage() {
 
   return (
     <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-      {/* Chat header */}
       <div className="flex items-center gap-3 mb-2 bg-card/50 rounded-xl px-3 py-2 border border-border">
-        <button onClick={() => setSelectedPrivateUserId('')} className="text-muted-foreground hover:text-foreground text-sm transition-colors">
-          →
-        </button>
+        <button onClick={() => setSelectedPrivateUserId('')} className="text-muted-foreground hover:text-foreground text-sm transition-colors">→</button>
         <div className="relative flex-shrink-0">
           <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-xs font-bold overflow-hidden">
             {selectedUser?.avatar_url ? <img src={selectedUser.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(selectedUser?.username || '')}
@@ -231,7 +252,6 @@ export default function PrivateChatPage() {
         </div>
       </div>
 
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
         {messages.length === 0 && (
           <p className="text-center text-muted-foreground text-sm py-12 opacity-60">لا توجد رسائل بعد...</p>
@@ -259,7 +279,6 @@ export default function PrivateChatPage() {
         })}
       </div>
 
-      {/* Input */}
       <div className="chat-input-group">
         <input
           className="flex-1 bg-transparent border-none outline-none text-foreground text-sm placeholder:text-muted-foreground"
