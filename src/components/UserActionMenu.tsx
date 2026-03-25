@@ -6,14 +6,16 @@ interface UserActionMenuProps {
   userId: string;
   username: string;
   avatarUrl: string | null;
-  position?: { x: number; y: number };
   onClose: () => void;
 }
 
 export default function UserActionMenu({ userId, username, avatarUrl, onClose }: UserActionMenuProps) {
-  const { currentUserId, setSelectedPrivateUserId, setActivePage, setViewProfileUserId } = useChatStore();
+  const { currentUserId, setSelectedPrivateUserId, setActivePage, setViewProfileUserId, blockedUserIds, setBlockedUserIds } = useChatStore();
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [blocking, setBlocking] = useState(false);
+
+  const isBlocked = blockedUserIds.includes(userId);
 
   const handleProfile = () => {
     setViewProfileUserId(userId);
@@ -31,12 +33,24 @@ export default function UserActionMenu({ userId, username, avatarUrl, onClose }:
     if (!currentUserId || adding) return;
     setAdding(true);
     try {
-      await supabase.from('friends' as any).insert({ user_id: currentUserId, friend_id: userId } as any);
+      await supabase.from('friends').insert({ user_id: currentUserId, friend_id: userId });
       setAdded(true);
-    } catch {
-      // already friends or error
-    }
+    } catch { /* already friends */ }
     setAdding(false);
+  };
+
+  const handleBlock = async () => {
+    if (!currentUserId || blocking) return;
+    setBlocking(true);
+    if (isBlocked) {
+      await supabase.from('blocked_users' as any).delete().eq('blocker_id', currentUserId).eq('blocked_id', userId);
+      setBlockedUserIds(blockedUserIds.filter(id => id !== userId));
+    } else {
+      await supabase.from('blocked_users' as any).insert({ blocker_id: currentUserId, blocked_id: userId } as any);
+      setBlockedUserIds([...blockedUserIds, userId]);
+    }
+    setBlocking(false);
+    onClose();
   };
 
   const getInitial = (name: string) => name?.charAt(0) || '?';
@@ -72,6 +86,15 @@ export default function UserActionMenu({ userId, username, avatarUrl, onClose }:
         >
           <span>{added ? '✅' : '➕'}</span>
           <span>{added ? 'تم الإرسال' : adding ? 'جاري...' : 'إضافة صديق'}</span>
+        </button>
+
+        <button
+          onClick={handleBlock}
+          disabled={blocking}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-destructive/10 transition-colors text-sm text-destructive disabled:opacity-50"
+        >
+          <span>{isBlocked ? '✅' : '🚫'}</span>
+          <span>{isBlocked ? 'إلغاء الحظر' : blocking ? 'جاري...' : 'حظر المستخدم'}</span>
         </button>
 
         <button onClick={onClose} className="w-full text-center text-xs text-muted-foreground py-1.5 hover:text-foreground transition-colors">

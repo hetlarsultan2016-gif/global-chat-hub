@@ -10,6 +10,7 @@ import OnlineUsers from '@/components/OnlineUsers';
 import CountriesPage from '@/components/CountriesPage';
 import RoomsPage from '@/components/RoomsPage';
 import ViewProfilePage from '@/components/ViewProfilePage';
+import FriendsPage from '@/components/FriendsPage';
 
 const NAV_ITEMS = [
   { id: 'public', icon: '💬', label: 'عام' },
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { id: 'rooms', icon: '🏠', label: 'الغرف' },
   { id: 'countries', icon: '🌎', label: 'الدول' },
   { id: 'private', icon: '📩', label: 'رسائل' },
+  { id: 'friends', icon: '🤝', label: 'أصدقاء' },
   { id: 'online', icon: '👥', label: 'أعضاء' },
   { id: 'profile', icon: '👤', label: 'حسابي' },
 ];
@@ -27,18 +29,28 @@ const PAGES: Record<string, React.FC> = {
   rooms: RoomsPage,
   countries: CountriesPage,
   private: PrivateChatPage,
+  friends: FriendsPage,
   online: OnlineUsers,
   profile: ProfilePage,
   viewProfile: ViewProfilePage,
 };
 
 export default function Index() {
-  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser, unreadCount, setUnreadCount } = useChatStore();
+  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser, unreadCount, setUnreadCount, setBlockedUserIds } = useChatStore();
+
+  // Load blocked users
+  useEffect(() => {
+    if (!currentUserId) return;
+    const loadBlocked = async () => {
+      const { data } = await supabase.from('blocked_users' as any).select('blocked_id').eq('blocker_id', currentUserId);
+      if (data) setBlockedUserIds((data as any[]).map((b: any) => b.blocked_id));
+    };
+    loadBlocked();
+  }, [currentUserId]);
 
   // Fetch unread count
   useEffect(() => {
     if (!currentUserId) return;
-
     const fetchUnread = async () => {
       const { count } = await supabase
         .from('private_messages')
@@ -47,14 +59,11 @@ export default function Index() {
         .eq('is_read', false);
       setUnreadCount(count || 0);
     };
-
     fetchUnread();
-
     const channel = supabase
       .channel(`unread-${currentUserId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => fetchUnread())
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [currentUserId]);
 
@@ -72,15 +81,12 @@ export default function Index() {
         store.setActivePage('login');
       }
     };
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       handleSession(session);
     });
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       handleSession(session);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -97,7 +103,6 @@ export default function Index() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" dir="rtl">
-      {/* Header */}
       <header className="glass-header px-4 py-3 z-50 flex items-center justify-between">
         <button onClick={handleLogout} className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-lg hover:bg-destructive/10">
           خروج
@@ -112,16 +117,13 @@ export default function Index() {
         </div>
       </header>
 
-      {/* Navigation */}
       <nav className="flex bg-card/80 backdrop-blur-sm border-b border-border px-1 py-1 overflow-x-auto z-40 gap-0.5" style={{ scrollbarWidth: 'none' }}>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
             className={`nav-item-chat min-w-[44px] flex-shrink-0 relative ${
-              activePage === item.id
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground'
+              activePage === item.id ? 'bg-primary/15 text-primary' : 'text-muted-foreground'
             }`}
           >
             <span className="text-base">{item.icon}</span>
@@ -135,7 +137,6 @@ export default function Index() {
         ))}
       </nav>
 
-      {/* Content */}
       <main className="flex-1 overflow-y-auto min-h-0">
         <div className="h-full flex flex-col p-3">
           <PageComponent />

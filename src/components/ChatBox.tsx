@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatStore } from '@/lib/chatStore';
+import { filterMessage } from '@/lib/moderation';
 import UserActionMenu from './UserActionMenu';
 
 interface ChatBoxProps {
@@ -20,12 +21,13 @@ interface MessageWithProfile {
 const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪', '🥰', '😢'];
 
 export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
-  const { currentUserId, currentUsername } = useChatStore();
+  const { currentUserId, currentUsername, blockedUserIds, replyToUsername, setReplyToUsername } = useChatStore();
   const [messages, setMessages] = useState<MessageWithProfile[]>([]);
   const [text, setText] = useState('');
   const [showEmojis, setShowEmojis] = useState(false);
   const [actionMenu, setActionMenu] = useState<{ userId: string; username: string; avatarUrl: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null }>>({});
 
   const resolveProfile = useCallback(async (userId: string) => {
@@ -73,15 +75,11 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     const channel = supabase
       .channel(`room-${roomId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
+        event: 'INSERT', schema: 'public', table: 'messages',
         filter: `room_id=eq.${roomId}`
       }, async (payload) => {
         const newMsg = payload.new as any;
-        // Skip if it's our own optimistic message
         if (newMsg.user_id === currentUserId) {
-          // Replace optimistic with real
           setMessages(prev => {
             const hasOptimistic = prev.some(m => m.id.startsWith('optimistic-'));
             if (hasOptimistic) {
@@ -95,17 +93,12 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           });
           return;
         }
-        // For other users' messages, append directly
         const profile = await resolveProfile(newMsg.user_id);
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, {
-            id: newMsg.id,
-            text: newMsg.text,
-            created_at: newMsg.created_at,
-            user_id: newMsg.user_id,
-            username: profile.username,
-            avatar_url: profile.avatar_url,
+            id: newMsg.id, text: newMsg.text, created_at: newMsg.created_at,
+            user_id: newMsg.user_id, username: profile.username, avatar_url: profile.avatar_url,
           }];
         });
       })
@@ -119,22 +112,25 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
 
   const handleSend = async () => {
     if (!text.trim() || !currentUserId) return;
-    const msg = text;
+    const { clean, blocked } = filterMessage(text);
+    const finalText = blocked ? clean : text;
     setText('');
+    setReplyToUsername(null);
 
-    // Optimistic update - show message instantly
     const optimisticId = `optimistic-${Date.now()}`;
     const myProfile = profilesCache.current[currentUserId] || { username: currentUsername || 'أنت', avatar_url: null };
     setMessages(prev => [...prev, {
-      id: optimisticId,
-      text: msg,
-      created_at: new Date().toISOString(),
-      user_id: currentUserId,
-      username: myProfile.username,
-      avatar_url: myProfile.avatar_url,
+      id: optimisticId, text: finalText, created_at: new Date().toISOString(),
+      user_id: currentUserId, username: myProfile.username, avatar_url: myProfile.avatar_url,
     }]);
 
-    await supabase.from('messages').insert({ room_id: roomId, user_id: currentUserId, text: msg });
+    await supabase.from('messages').insert({ room_id: roomId, user_id: currentUserId, text: finalText });
+  };
+
+  const handleReply = (username: string) => {
+    setReplyToUsername(username);
+    setText(`@${username} `);
+    inputRef.current?.focus();
   };
 
   const formatTime = (dateStr: string) =>
@@ -147,14 +143,22 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     setActionMenu({ userId: m.user_id, username: m.username, avatarUrl: m.avatar_url });
   };
 
+  // Filter blocked users' messages
+  const visibleMessages = messages.filter(m => !blockedUserIds.includes(m.user_id));
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
-        {messages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <p className="text-center text-muted-foreground text-sm py-12 opacity-60">لا توجد رسائل بعد...</p>
         )}
-        {messages.map((m) => {
+        {visibleMessages.map((m) => {
           const isMine = m.user_id === currentUserId;
+          // Detect reply prefix
+          const replyMatch = m.text.match(/^@(\S+)\s/);
+          const replyTarget = replyMatch ? replyMatch[1] : null;
+          const messageBody = replyTarget ? m.text.slice(replyMatch![0].length) : m.text;
+
           return (
             <div key={m.id} className={`message-bubble max-w-[80%] flex gap-2 ${isMine ? 'flex-row-reverse mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
               {!isMine && (
@@ -168,13 +172,18 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
               <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
                 {!isMine && (
                   <span
-                    onClick={() => handleAvatarClick(m)}
-                    className="font-semibold text-xs opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity"
+                    onClick={() => handleReply(m.username)}
+                    className="font-semibold text-xs opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
                   >
                     {m.username}
                   </span>
                 )}
-                <span className="leading-relaxed">{m.text}</span>
+                {replyTarget && (
+                  <div className="text-[10px] opacity-50 mb-1 bg-background/20 rounded px-1.5 py-0.5 inline-block">
+                    ↩ رد على @{replyTarget}
+                  </div>
+                )}
+                <span className="leading-relaxed block">{messageBody}</span>
                 <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
             </div>
@@ -192,8 +201,16 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
         </div>
       )}
 
+      {replyToUsername && (
+        <div className="flex items-center gap-2 mb-1 px-2 py-1 bg-secondary/50 rounded-lg text-xs text-muted-foreground">
+          <span>↩ رد على <strong>{replyToUsername}</strong></span>
+          <button onClick={() => { setReplyToUsername(null); setText(''); }} className="mr-auto text-destructive hover:text-destructive/80">✕</button>
+        </div>
+      )}
+
       <div className="chat-input-group">
         <input
+          ref={inputRef}
           className="flex-1 bg-transparent border-none outline-none text-foreground text-sm placeholder:text-muted-foreground"
           placeholder="اكتب رسالتك..."
           value={text}
