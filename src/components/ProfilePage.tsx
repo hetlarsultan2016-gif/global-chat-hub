@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
+import { isSoundEnabled, setSoundEnabled } from '@/lib/notificationSound';
 
 export default function ProfilePage() {
   const { currentUserId } = useChatStore();
@@ -10,6 +11,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -111,6 +113,17 @@ export default function ProfilePage() {
           <label className="text-xs text-muted-foreground mb-1.5 block">العمر</label>
           <input className="input-field" type="number" placeholder="العمر" value={age} onChange={(e) => setAge(e.target.value)} />
         </div>
+
+        <div className="flex items-center justify-between bg-secondary/50 rounded-xl px-4 py-3">
+          <span className="text-sm font-medium">🔔 الإشعارات الصوتية</span>
+          <button
+            onClick={() => { const next = !soundOn; setSoundOn(next); setSoundEnabled(next); }}
+            className={`w-11 h-6 rounded-full relative transition-colors ${soundOn ? 'bg-primary' : 'bg-muted'}`}
+          >
+            <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-background shadow transition-all ${soundOn ? 'right-0.5' : 'right-auto left-0.5'}`} />
+          </button>
+        </div>
+
         <button disabled={loading} onClick={handleSave} className="w-full btn-primary">
           {loading ? 'جاري الحفظ...' : saved ? '✓ تم الحفظ' : 'حفظ التغييرات'}
         </button>
