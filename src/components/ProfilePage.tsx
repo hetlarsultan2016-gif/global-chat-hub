@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
+import { isSoundEnabled, setSoundEnabled } from '@/lib/notificationSound';
 
 export default function ProfilePage() {
   const { currentUserId } = useChatStore();
