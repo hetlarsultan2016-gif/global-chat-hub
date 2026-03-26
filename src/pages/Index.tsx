@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
+import { playNotificationSound } from '@/lib/notificationSound';
 import LoginPage from '@/components/LoginPage';
 import PublicChatPage from '@/components/PublicChatPage';
 import DatingChatPage from '@/components/DatingChatPage';
@@ -62,7 +63,14 @@ export default function Index() {
     fetchUnread();
     const channel = supabase
       .channel(`unread-${currentUserId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'private_messages' }, () => fetchUnread())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'private_messages' }, (payload) => {
+        fetchUnread();
+        const newMsg = payload.new as any;
+        if (newMsg.receiver_id === currentUserId && newMsg.sender_id !== currentUserId) {
+          playNotificationSound();
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'private_messages' }, () => fetchUnread())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [currentUserId]);

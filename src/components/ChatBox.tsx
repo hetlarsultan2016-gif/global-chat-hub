@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatStore } from '@/lib/chatStore';
 import { filterMessage } from '@/lib/moderation';
+import { playNotificationSound } from '@/lib/notificationSound';
 import UserActionMenu from './UserActionMenu';
 
 interface ChatBoxProps {
@@ -94,6 +95,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           return;
         }
         const profile = await resolveProfile(newMsg.user_id);
+        playNotificationSound();
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, {
