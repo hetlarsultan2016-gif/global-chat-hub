@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useChatStore } from '@/lib/chatStore';
 import { filterMessage } from '@/lib/moderation';
+import { playNotificationSound } from '@/lib/notificationSound';
 import UserActionMenu from './UserActionMenu';
 
 interface ChatBoxProps {
