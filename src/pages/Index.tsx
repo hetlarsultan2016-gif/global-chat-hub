@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/chatStore';
 import { supabase } from '@/integrations/supabase/client';
+import { playNotificationSound } from '@/lib/notificationSound';
 import LoginPage from '@/components/LoginPage';
 import PublicChatPage from '@/components/PublicChatPage';
 import DatingChatPage from '@/components/DatingChatPage';
