@@ -11,6 +11,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
