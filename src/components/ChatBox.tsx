@@ -95,6 +95,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           return;
         }
         const profile = await resolveProfile(newMsg.user_id);
+        playNotificationSound();
         setMessages(prev => {
           if (prev.some(m => m.id === newMsg.id)) return prev;
           return [...prev, {
