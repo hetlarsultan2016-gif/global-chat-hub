@@ -14,6 +14,7 @@ interface Room {
 export default function RoomsPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [showMembers, setShowMembers] = useState(false);
 
   useEffect(() => {
     const fetchRooms = async () => {
