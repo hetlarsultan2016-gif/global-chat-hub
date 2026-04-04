@@ -118,6 +118,27 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_likes: {
+        Row: {
+          created_at: string
+          id: string
+          liked_id: string
+          liker_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          liked_id: string
+          liker_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          liked_id?: string
+          liker_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age: number | null
@@ -125,10 +146,14 @@ export type Database = {
           bio: string | null
           country: string | null
           created_at: string
+          font_color: string | null
+          font_style: string | null
           gender: string | null
           id: string
           is_online: boolean
           level: number
+          likes_count: number
+          name_color: string | null
           updated_at: string
           user_id: string
           username: string
@@ -139,10 +164,14 @@ export type Database = {
           bio?: string | null
           country?: string | null
           created_at?: string
+          font_color?: string | null
+          font_style?: string | null
           gender?: string | null
           id?: string
           is_online?: boolean
           level?: number
+          likes_count?: number
+          name_color?: string | null
           updated_at?: string
           user_id: string
           username: string
@@ -153,10 +182,14 @@ export type Database = {
           bio?: string | null
           country?: string | null
           created_at?: string
+          font_color?: string | null
+          font_style?: string | null
           gender?: string | null
           id?: string
           is_online?: boolean
           level?: number
+          likes_count?: number
+          name_color?: string | null
           updated_at?: string
           user_id?: string
           username?: string
