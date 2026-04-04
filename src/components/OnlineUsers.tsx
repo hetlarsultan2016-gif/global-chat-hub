@@ -56,8 +56,11 @@ export default function OnlineUsers({ roomId }: OnlineUsersProps) {
       }
     };
     fetchUsers();
-    const interval = setInterval(fetchUsers, 5000);
-    return () => clearInterval(interval);
+    const channel = supabase
+      .channel(`online-users-${roomId || 'global'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchUsers())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [currentUserId, roomId, search]);
 
   const filtered = users.filter((u) => {
