@@ -28,6 +28,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   unreadCount: 0,
   replyToUsername: null,
   blockedUserIds: [],
+  isAdmin: false,
   viewProfileUserId: null,
   setCurrentUser: (id, username) => set({ currentUserId: id, currentUsername: username }),
   setActivePage: (page) => set({ activePage: page }),
@@ -35,5 +36,6 @@ export const useChatStore = create<ChatStore>((set) => ({
   setUnreadCount: (count) => set({ unreadCount: count }),
   setReplyToUsername: (username) => set({ replyToUsername: username }),
   setBlockedUserIds: (ids) => set({ blockedUserIds: ids }),
+  setIsAdmin: (val) => set({ isAdmin: val }),
   setViewProfileUserId: (id) => set({ viewProfileUserId: id }),
 }));
