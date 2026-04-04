@@ -17,6 +17,9 @@ interface MessageWithProfile {
   user_id: string;
   username: string;
   avatar_url: string | null;
+  name_color: string | null;
+  font_color: string | null;
+  font_style: string | null;
 }
 
 const EMOJIS = ['😀', '😂', '😍', '👍', '🎉', '❤️', '🔥', '😎', '🤗', '💪', '🥰', '😢'];
@@ -29,16 +32,16 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
   const [actionMenu, setActionMenu] = useState<{ userId: string; username: string; avatarUrl: string | null } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null }>>({});
+  const profilesCache = useRef<Record<string, { username: string; avatar_url: string | null; name_color: string | null; font_color: string | null; font_style: string | null }>>({});
 
   const resolveProfile = useCallback(async (userId: string) => {
     if (profilesCache.current[userId]) return profilesCache.current[userId];
-    const { data } = await supabase.from('profiles').select('user_id, username, avatar_url').eq('user_id', userId).single();
+    const { data } = await supabase.from('profiles').select('user_id, username, avatar_url, name_color, font_color, font_style').eq('user_id', userId).single();
     if (data) {
-      profilesCache.current[data.user_id] = { username: data.username, avatar_url: data.avatar_url };
+      profilesCache.current[data.user_id] = { username: data.username, avatar_url: data.avatar_url, name_color: (data as any).name_color, font_color: (data as any).font_color, font_style: (data as any).font_style };
       return profilesCache.current[data.user_id];
     }
-    return { username: 'مجهول', avatar_url: null };
+    return { username: 'مجهول', avatar_url: null, name_color: null, font_color: null, font_style: null };
   }, []);
 
   const loadMessages = useCallback(async () => {
@@ -55,20 +58,26 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     if (uncached.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
-        .select('user_id, username, avatar_url')
+        .select('user_id, username, avatar_url, name_color, font_color, font_style')
         .in('user_id', uncached);
       if (profiles) {
-        profiles.forEach(p => {
-          profilesCache.current[p.user_id] = { username: p.username, avatar_url: p.avatar_url };
+        profiles.forEach((p: any) => {
+          profilesCache.current[p.user_id] = { username: p.username, avatar_url: p.avatar_url, name_color: p.name_color, font_color: p.font_color, font_style: p.font_style };
         });
       }
     }
 
-    setMessages(data.map(m => ({
-      ...m,
-      username: profilesCache.current[m.user_id]?.username || 'مجهول',
-      avatar_url: profilesCache.current[m.user_id]?.avatar_url || null,
-    })));
+    setMessages(data.map(m => {
+      const p = profilesCache.current[m.user_id];
+      return {
+        ...m,
+        username: p?.username || 'مجهول',
+        avatar_url: p?.avatar_url || null,
+        name_color: p?.name_color || null,
+        font_color: p?.font_color || null,
+        font_style: p?.font_style || null,
+      };
+    }));
   }, [roomId]);
 
   useEffect(() => {
@@ -101,6 +110,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           return [...prev, {
             id: newMsg.id, text: newMsg.text, created_at: newMsg.created_at,
             user_id: newMsg.user_id, username: profile.username, avatar_url: profile.avatar_url,
+            name_color: profile.name_color, font_color: profile.font_color, font_style: profile.font_style,
           }];
         });
       })
@@ -120,10 +130,11 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     setReplyToUsername(null);
 
     const optimisticId = `optimistic-${Date.now()}`;
-    const myProfile = profilesCache.current[currentUserId] || { username: currentUsername || 'أنت', avatar_url: null };
+    const myProfile = profilesCache.current[currentUserId] || { username: currentUsername || 'أنت', avatar_url: null, name_color: null, font_color: null, font_style: null };
     setMessages(prev => [...prev, {
       id: optimisticId, text: finalText, created_at: new Date().toISOString(),
       user_id: currentUserId, username: myProfile.username, avatar_url: myProfile.avatar_url,
+      name_color: myProfile.name_color, font_color: myProfile.font_color, font_style: myProfile.font_style,
     }]);
 
     await supabase.from('messages').insert({ room_id: roomId, user_id: currentUserId, text: finalText });
@@ -145,7 +156,12 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
     setActionMenu({ userId: m.user_id, username: m.username, avatarUrl: m.avatar_url });
   };
 
-  // Filter blocked users' messages
+  const getFontStyles = (m: MessageWithProfile) => ({
+    color: m.font_color || undefined,
+    fontStyle: m.font_style?.includes('italic') ? 'italic' as const : 'normal' as const,
+    fontWeight: m.font_style?.includes('bold') ? 'bold' as const : 'normal' as const,
+  });
+
   const visibleMessages = messages.filter(m => !blockedUserIds.includes(m.user_id));
 
   return (
@@ -156,7 +172,6 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
         )}
         {visibleMessages.map((m) => {
           const isMine = m.user_id === currentUserId;
-          // Detect reply prefix
           const replyMatch = m.text.match(/^@(\S+)\s/);
           const replyTarget = replyMatch ? replyMatch[1] : null;
           const messageBody = replyTarget ? m.text.slice(replyMatch![0].length) : m.text;
@@ -176,6 +191,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
                   <span
                     onClick={() => handleReply(m.username)}
                     className="font-semibold text-xs opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
+                    style={{ color: m.name_color || undefined }}
                   >
                     {m.username}
                   </span>
@@ -185,7 +201,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
                     ↩ رد على @{replyTarget}
                   </div>
                 )}
-                <span className="leading-relaxed block">{messageBody}</span>
+                <span className="leading-relaxed block" style={getFontStyles(m)}>{messageBody}</span>
                 <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
             </div>

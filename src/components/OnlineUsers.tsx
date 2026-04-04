@@ -12,7 +12,11 @@ interface Profile {
   is_online: boolean;
 }
 
-export default function OnlineUsers() {
+interface OnlineUsersProps {
+  roomId?: string;
+}
+
+export default function OnlineUsers({ roomId }: OnlineUsersProps) {
   const { currentUserId, setSelectedPrivateUserId, setActivePage } = useChatStore();
   const [users, setUsers] = useState<Profile[]>([]);
   const [search, setSearch] = useState('');
@@ -22,22 +26,47 @@ export default function OnlineUsers() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('user_id, username, gender, age, avatar_url, bio, is_online')
-        .neq('user_id', currentUserId || '');
-      if (data) setUsers(data);
+      if (roomId && !search.trim()) {
+        // When in a room and not searching, show only users who sent messages in this room recently
+        const { data: msgData } = await supabase
+          .from('messages')
+          .select('user_id')
+          .eq('room_id', roomId)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (msgData) {
+          const roomUserIds = [...new Set(msgData.map(m => m.user_id))].filter(id => id !== currentUserId);
+          if (roomUserIds.length > 0) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('user_id, username, gender, age, avatar_url, bio, is_online')
+              .in('user_id', roomUserIds);
+            if (data) { setUsers(data); return; }
+          } else {
+            setUsers([]); return;
+          }
+        }
+      } else {
+        // Default: show all users
+        const { data } = await supabase
+          .from('profiles')
+          .select('user_id, username, gender, age, avatar_url, bio, is_online')
+          .neq('user_id', currentUserId || '');
+        if (data) setUsers(data);
+      }
     };
     fetchUsers();
     const interval = setInterval(fetchUsers, 5000);
     return () => clearInterval(interval);
-  }, [currentUserId]);
+  }, [currentUserId, roomId, search]);
 
   const filtered = users.filter((u) => {
-    if (!u.username.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && !u.username.toLowerCase().includes(search.toLowerCase())) return false;
     if (genderFilter !== 'all' && u.gender !== genderFilter) return false;
     if (typeFilter === 'guest' && !u.username.startsWith('زائر_')) return false;
     if (typeFilter === 'member' && u.username.startsWith('زائر_')) return false;
+    // When no search in global view, show only online users
+    if (!roomId && !search.trim()) return u.is_online;
     return true;
   });
   const onlineCount = users.filter(u => u.is_online).length;
@@ -61,30 +90,21 @@ export default function OnlineUsers() {
     <div className="space-y-3" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
       <div className="flex items-center gap-2 mb-1">
         <span className="text-lg">👥</span>
-        <h2 className="font-bold text-base">الأعضاء</h2>
+        <h2 className="font-bold text-base">{roomId ? 'أعضاء الغرفة' : 'الأعضاء المتصلون'}</h2>
         <span className="text-xs bg-primary/15 text-primary px-2 py-0.5 rounded-lg mr-auto">
-          {onlineCount} متصل
+          {roomId ? `${filtered.length} عضو` : `${onlineCount} متصل`}
         </span>
       </div>
 
-      <input className="input-field" placeholder="ابحث عن عضو..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      <input className="input-field" placeholder="ابحث عن عضو (يظهر الكل عند البحث)..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
-      {/* Filters */}
       <div className="flex gap-2">
-        <select
-          className="input-field text-xs flex-1"
-          value={genderFilter}
-          onChange={(e) => setGenderFilter(e.target.value)}
-        >
+        <select className="input-field text-xs flex-1" value={genderFilter} onChange={(e) => setGenderFilter(e.target.value)}>
           <option value="all">الكل</option>
           <option value="male">ذكر</option>
           <option value="female">أنثى</option>
         </select>
-        <select
-          className="input-field text-xs flex-1"
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
+        <select className="input-field text-xs flex-1" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="all">الكل</option>
           <option value="member">عضو</option>
           <option value="guest">زائر</option>
@@ -112,7 +132,9 @@ export default function OnlineUsers() {
           </div>
         ))}
         {filtered.length === 0 && (
-          <p className="text-center text-muted-foreground text-sm py-8 opacity-60">لا يوجد أعضاء</p>
+          <p className="text-center text-muted-foreground text-sm py-8 opacity-60">
+            {search ? 'لا يوجد نتائج' : roomId ? 'لا يوجد أعضاء في الغرفة' : 'لا يوجد أعضاء متصلون'}
+          </p>
         )}
       </div>
 
