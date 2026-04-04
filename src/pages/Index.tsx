@@ -12,6 +12,7 @@ import CountriesPage from '@/components/CountriesPage';
 import RoomsPage from '@/components/RoomsPage';
 import ViewProfilePage from '@/components/ViewProfilePage';
 import FriendsPage from '@/components/FriendsPage';
+import AdminPage from '@/components/AdminPage';
 
 const NAV_ITEMS = [
   { id: 'public', icon: '💬', label: 'عام' },
@@ -34,10 +35,21 @@ const PAGES: Record<string, React.FC> = {
   online: OnlineUsers,
   profile: ProfilePage,
   viewProfile: ViewProfilePage,
+  admin: AdminPage,
 };
 
 export default function Index() {
-  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser, unreadCount, setUnreadCount, setBlockedUserIds } = useChatStore();
+  const { activePage, setActivePage, currentUserId, currentUsername, setCurrentUser, unreadCount, setUnreadCount, setBlockedUserIds, isAdmin, setIsAdmin } = useChatStore();
+
+  // Check admin role
+  useEffect(() => {
+    if (!currentUserId) return;
+    const checkAdmin = async () => {
+      const { data } = await supabase.from('user_roles' as any).select('role').eq('user_id', currentUserId).eq('role', 'admin');
+      setIsAdmin(!!data && (data as any[]).length > 0);
+    };
+    checkAdmin();
+  }, [currentUserId, setIsAdmin]);
 
   // Load blocked users
   useEffect(() => {
@@ -109,6 +121,8 @@ export default function Index() {
     setActivePage('login');
   };
 
+  const navItems = isAdmin ? [...NAV_ITEMS, { id: 'admin', icon: '🛡️', label: 'إدارة' }] : NAV_ITEMS;
+
   return (
     <div className="flex flex-col h-screen overflow-hidden" dir="rtl">
       <header className="glass-header px-4 py-3 z-50 flex items-center justify-between">
@@ -126,7 +140,7 @@ export default function Index() {
       </header>
 
       <nav className="flex bg-card/80 backdrop-blur-sm border-b border-border px-1 py-1 overflow-x-auto z-40 gap-0.5" style={{ scrollbarWidth: 'none' }}>
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
