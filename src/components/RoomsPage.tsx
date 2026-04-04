@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import ChatBox from './ChatBox';
+import OnlineUsers from './OnlineUsers';
 
 interface Room {
   id: string;
