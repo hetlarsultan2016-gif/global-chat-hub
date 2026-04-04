@@ -29,15 +29,39 @@ export default function RoomsPage() {
   }, []);
 
   if (selectedRoom) {
+    if (showMembers) {
+      return (
+        <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+          <button
+            onClick={() => setShowMembers(false)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 self-start px-2 py-1 rounded-lg hover:bg-secondary"
+          >
+            <span>→</span>
+            <span>رجوع للمحادثة</span>
+          </button>
+          <OnlineUsers roomId={selectedRoom.id} />
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col h-full" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-        <button
-          onClick={() => setSelectedRoom(null)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3 self-start px-2 py-1 rounded-lg hover:bg-secondary"
-        >
-          <span>→</span>
-          <span>رجوع للغرف</span>
-        </button>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setSelectedRoom(null)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary"
+          >
+            <span>→</span>
+            <span>رجوع</span>
+          </button>
+          <button
+            onClick={() => setShowMembers(true)}
+            className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors px-2 py-1 rounded-lg hover:bg-primary/10"
+          >
+            <span>👥</span>
+            <span>الأعضاء</span>
+          </button>
+        </div>
         <div className="flex items-center gap-2 mb-3 px-1">
           <span className="text-xl">{selectedRoom.image}</span>
           <div>
