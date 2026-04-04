@@ -8,12 +8,14 @@ interface ChatStore {
   unreadCount: number;
   replyToUsername: string | null;
   blockedUserIds: string[];
+  isAdmin: boolean;
   setCurrentUser: (id: string | null, username: string | null) => void;
   setActivePage: (page: string) => void;
   setSelectedPrivateUserId: (id: string) => void;
   setUnreadCount: (count: number) => void;
   setReplyToUsername: (username: string | null) => void;
   setBlockedUserIds: (ids: string[]) => void;
+  setIsAdmin: (val: boolean) => void;
   viewProfileUserId: string | null;
   setViewProfileUserId: (id: string | null) => void;
 }
