@@ -184,20 +184,20 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           const messageBody = replyTarget ? m.text.slice(replyMatch![0].length) : m.text;
 
           return (
-            <div key={m.id} className={`message-bubble flex gap-1.5 ${isMine ? 'flex-row-reverse' : ''}`} style={{ marginLeft: isMine ? 'auto' : '0', marginRight: isMine ? '0' : 'auto', maxWidth: '85%' }}>
+            <div key={m.id} className={`message-bubble flex items-end gap-1 ${isMine ? 'flex-row' : 'flex-row-reverse'}`} style={{ marginRight: isMine ? '0' : 'auto', marginLeft: isMine ? 'auto' : '0', maxWidth: '80%', [isMine ? 'marginLeft' : 'marginRight']: 'auto', [isMine ? 'marginRight' : 'marginLeft']: '0' }}>
               {!isMine && (
                 <div
                   onClick={() => handleAvatarClick(m)}
-                  className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                  className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold flex-shrink-0 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
                 >
                   {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(m.username)}
                 </div>
               )}
-              <div className={`px-2.5 py-1.5 text-[13px] ${isMine ? 'message-sent' : 'message-received'}`}>
+              <div className={`px-3 py-2 text-[13px] rounded-2xl ${isMine ? 'message-sent rounded-bl-sm' : 'message-received rounded-br-sm'}`}>
                 {!isMine && (
                   <span
                     onClick={() => handleReply(m.username)}
-                    className="font-semibold text-[11px] opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
+                    className="font-semibold text-[11px] opacity-80 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
                     style={{ color: m.name_color || undefined }}
                   >
                     {m.username}
@@ -208,7 +208,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
                     ↩ رد على @{replyTarget}
                   </div>
                 )}
-                <span className="leading-snug block" style={getFontStyles(m)}>{messageBody}</span>
+                <span className="leading-relaxed block" style={getFontStyles(m)}>{messageBody}</span>
                 <div className={`text-[9px] opacity-40 mt-0.5 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
             </div>
