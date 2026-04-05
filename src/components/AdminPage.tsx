@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [roles, setRoles] = useState<UserRole[]>([]);
   const [search, setSearch] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,6 +55,16 @@ export default function AdminPage() {
   const loadUsers = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('user_id, username, is_online, avatar_url').order('username');
     if (data) setUsers(data);
+  }, []);
+
+  const loadRoles = useCallback(async () => {
+    const { data } = await supabase.from('user_roles').select('user_id, role');
+    if (data) {
+      const userIds = [...new Set((data as any[]).map((r: any) => r.user_id))];
+      const { data: profiles } = await supabase.from('profiles').select('user_id, username').in('user_id', userIds);
+      const nameMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.username]));
+      setRoles((data as any[]).map((r: any) => ({ ...r, username: nameMap[r.user_id] || 'مجهول' })));
+    }
   }, []);
 
   const loadRooms = useCallback(async () => {
