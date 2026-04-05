@@ -125,31 +125,31 @@ export default function Index() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden" dir="rtl">
-      <header className="glass-header px-4 py-3 z-50 flex items-center justify-between">
-        <button onClick={handleLogout} className="text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-lg hover:bg-destructive/10">
+      <header className="glass-header px-3 py-1.5 z-50 flex items-center justify-between">
+        <button onClick={handleLogout} className="text-[10px] text-muted-foreground hover:text-destructive transition-colors px-1.5 py-0.5 rounded-lg hover:bg-destructive/10">
           خروج
         </button>
-        <div className="flex items-center gap-2">
-          <span className="text-lg">🌍</span>
-          <span className="font-bold text-sm">الدردشة العالمية</span>
-        </div>
         <div className="flex items-center gap-1.5">
+          <span className="text-sm">🌍</span>
+          <span className="font-bold text-xs">الدردشة العالمية</span>
+        </div>
+        <div className="flex items-center gap-1">
           <span className="online-dot active" />
-          <span className="text-xs text-muted-foreground">{currentUsername}</span>
+          <span className="text-[10px] text-muted-foreground">{currentUsername}</span>
         </div>
       </header>
 
-      <nav className="flex bg-card/80 backdrop-blur-sm border-b border-border px-1 py-1 overflow-x-auto z-40 gap-0.5" style={{ scrollbarWidth: 'none' }}>
+      <nav className="flex bg-card/80 backdrop-blur-sm border-b border-border px-0.5 py-0.5 overflow-x-auto z-40 gap-0" style={{ scrollbarWidth: 'none' }}>
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActivePage(item.id)}
-            className={`nav-item-chat min-w-[44px] flex-shrink-0 relative ${
+            className={`nav-item-chat min-w-[40px] flex-shrink-0 relative px-2 py-1 ${
               activePage === item.id ? 'bg-primary/15 text-primary' : 'text-muted-foreground'
             }`}
           >
-            <span className="text-base">{item.icon}</span>
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-sm">{item.icon}</span>
+            <span className="text-[9px] font-medium">{item.label}</span>
             {item.id === 'private' && unreadCount > 0 && (
               <span className="absolute -top-0.5 -left-0.5 bg-destructive text-destructive-foreground text-[9px] font-bold min-w-[16px] h-4 flex items-center justify-center rounded-full px-1 animate-pulse">
                 {unreadCount > 99 ? '99+' : unreadCount}

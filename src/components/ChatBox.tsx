@@ -173,7 +173,7 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 bg-background/50 rounded-2xl border border-border mb-2">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 space-y-1 bg-background/50 rounded-xl border border-border mb-1">
         {visibleMessages.length === 0 && (
           <p className="text-center text-muted-foreground text-sm py-12 opacity-60">لا توجد رسائل بعد...</p>
         )}
@@ -184,32 +184,32 @@ export default function ChatBox({ roomId, showEmoji = true }: ChatBoxProps) {
           const messageBody = replyTarget ? m.text.slice(replyMatch![0].length) : m.text;
 
           return (
-            <div key={m.id} className={`message-bubble max-w-[80%] flex gap-2 ${isMine ? 'flex-row-reverse mr-0 ml-auto' : 'ml-0 mr-auto'}`}>
+            <div key={m.id} className={`message-bubble flex gap-1.5 ${isMine ? 'flex-row-reverse' : ''}`} style={{ marginLeft: isMine ? 'auto' : '0', marginRight: isMine ? '0' : 'auto', maxWidth: '85%' }}>
               {!isMine && (
                 <div
                   onClick={() => handleAvatarClick(m)}
-                  className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-1 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
+                  className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all"
                 >
                   {m.avatar_url ? <img src={m.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(m.username)}
                 </div>
               )}
-              <div className={`px-3.5 py-2 text-sm ${isMine ? 'message-sent' : 'message-received'}`}>
+              <div className={`px-2.5 py-1.5 text-[13px] ${isMine ? 'message-sent' : 'message-received'}`}>
                 {!isMine && (
                   <span
                     onClick={() => handleReply(m.username)}
-                    className="font-semibold text-xs opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
+                    className="font-semibold text-[11px] opacity-70 block mb-0.5 cursor-pointer hover:opacity-100 transition-opacity hover:underline"
                     style={{ color: m.name_color || undefined }}
                   >
                     {m.username}
                   </span>
                 )}
                 {replyTarget && (
-                  <div className="text-[10px] opacity-50 mb-1 bg-background/20 rounded px-1.5 py-0.5 inline-block">
+                  <div className="text-[9px] opacity-50 mb-0.5 bg-background/20 rounded px-1 py-0.5 inline-block">
                     ↩ رد على @{replyTarget}
                   </div>
                 )}
-                <span className="leading-relaxed block" style={getFontStyles(m)}>{messageBody}</span>
-                <div className={`text-[10px] opacity-40 mt-1 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
+                <span className="leading-snug block" style={getFontStyles(m)}>{messageBody}</span>
+                <div className={`text-[9px] opacity-40 mt-0.5 ${isMine ? 'text-left' : 'text-right'}`}>{formatTime(m.created_at)}</div>
               </div>
             </div>
           );
