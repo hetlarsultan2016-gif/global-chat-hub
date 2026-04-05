@@ -27,7 +27,13 @@ interface Message {
   room_name?: string;
 }
 
-type Tab = 'messages' | 'users' | 'rooms';
+type Tab = 'messages' | 'users' | 'rooms' | 'moderators';
+
+interface UserRole {
+  user_id: string;
+  role: string;
+  username?: string;
+}
 
 export default function AdminPage() {
   const { currentUserId } = useChatStore();
