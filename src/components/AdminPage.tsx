@@ -27,7 +27,13 @@ interface Message {
   room_name?: string;
 }
 
-type Tab = 'messages' | 'users' | 'rooms';
+type Tab = 'messages' | 'users' | 'rooms' | 'moderators';
+
+interface UserRole {
+  user_id: string;
+  role: string;
+  username?: string;
+}
 
 export default function AdminPage() {
   const { currentUserId } = useChatStore();
@@ -35,6 +41,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [roles, setRoles] = useState<UserRole[]>([]);
   const [search, setSearch] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,6 +55,16 @@ export default function AdminPage() {
   const loadUsers = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('user_id, username, is_online, avatar_url').order('username');
     if (data) setUsers(data);
+  }, []);
+
+  const loadRoles = useCallback(async () => {
+    const { data } = await supabase.from('user_roles').select('user_id, role');
+    if (data) {
+      const userIds = [...new Set((data as any[]).map((r: any) => r.user_id))];
+      const { data: profiles } = await supabase.from('profiles').select('user_id, username').in('user_id', userIds);
+      const nameMap = Object.fromEntries((profiles || []).map(p => [p.user_id, p.username]));
+      setRoles((data as any[]).map((r: any) => ({ ...r, username: nameMap[r.user_id] || 'مجهول' })));
+    }
   }, []);
 
   const loadRooms = useCallback(async () => {
@@ -77,7 +94,8 @@ export default function AdminPage() {
     if (tab === 'users') loadUsers();
     if (tab === 'rooms') loadRooms();
     if (tab === 'messages') loadMessages();
-  }, [tab, loadUsers, loadRooms, loadMessages]);
+    if (tab === 'moderators') { loadRoles(); loadUsers(); }
+  }, [tab, loadUsers, loadRooms, loadMessages, loadRoles]);
 
   const deleteMessage = async (id: string) => {
     setLoading(true);
@@ -118,16 +136,33 @@ export default function AdminPage() {
     setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_pinned: !r.is_pinned } : r));
   };
 
+  const assignRole = async (userId: string, role: string) => {
+    setLoading(true);
+    await supabase.from('user_roles').insert({ user_id: userId, role } as any);
+    await loadRoles();
+    setLoading(false);
+  };
+
+  const removeRole = async (userId: string, role: string) => {
+    setLoading(true);
+    await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role as any);
+    await loadRoles();
+    setLoading(false);
+  };
+
   const formatTime = (d: string) => new Date(d).toLocaleString('ar', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const getInitial = (n: string) => n?.charAt(0) || '?';
 
   const filteredUsers = users.filter(u => !search || u.username.toLowerCase().includes(search.toLowerCase()));
   const filteredMessages = messages.filter(m => !search || m.text.includes(search) || (m.username || '').includes(search));
+  const modRoleUserIds = roles.map(r => r.user_id);
+  const nonModUsers = filteredUsers.filter(u => !modRoleUserIds.includes(u.user_id));
 
   const TABS: { id: Tab; icon: string; label: string }[] = [
     { id: 'messages', icon: '💬', label: 'الرسائل' },
     { id: 'users', icon: '👥', label: 'المستخدمين' },
     { id: 'rooms', icon: '🏠', label: 'الغرف' },
+    { id: 'moderators', icon: '🛡️', label: 'المشرفين' },
   ];
 
   return (
@@ -259,6 +294,60 @@ export default function AdminPage() {
                 </button>
                 <button onClick={() => deleteRoom(r.id)} disabled={loading} className="text-xs text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-colors" title="حذف الغرفة">
                   🗑️
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Moderators Tab */}
+      {tab === 'moderators' && (
+        <div className="flex-1 overflow-y-auto space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">المشرفون الحاليون</h3>
+          {roles.length === 0 && <p className="text-center text-muted-foreground text-sm py-4 opacity-60">لا يوجد مشرفون</p>}
+          {roles.map(r => (
+            <div key={`${r.user_id}-${r.role}`} className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border">
+              <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold">
+                {getInitial(r.username || '')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{r.username}</p>
+                <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded-md">{r.role === 'admin' ? 'مشرف عام' : r.role === 'moderator' ? 'مشرف' : 'عضو'}</span>
+              </div>
+              {r.user_id !== currentUserId && (
+                <button
+                  onClick={() => removeRole(r.user_id, r.role)}
+                  disabled={loading}
+                  className="text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors"
+                >
+                  ❌ إزالة
+                </button>
+              )}
+            </div>
+          ))}
+
+          <h3 className="text-sm font-semibold text-muted-foreground mt-4">تعيين مشرف جديد</h3>
+          {nonModUsers.map(u => (
+            <div key={u.user_id} className="flex items-center gap-3 p-2.5 bg-card rounded-xl border border-border">
+              <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold">
+                {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(u.username)}
+              </div>
+              <p className="flex-1 font-medium text-sm truncate">{u.username}</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => assignRole(u.user_id, 'moderator')}
+                  disabled={loading}
+                  className="text-[10px] bg-primary/15 text-primary hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
+                >
+                  مشرف
+                </button>
+                <button
+                  onClick={() => assignRole(u.user_id, 'admin')}
+                  disabled={loading}
+                  className="text-[10px] bg-accent text-accent-foreground hover:bg-accent/80 px-2 py-1 rounded-lg transition-colors"
+                >
+                  مشرف عام
                 </button>
               </div>
             </div>
