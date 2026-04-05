@@ -136,16 +136,33 @@ export default function AdminPage() {
     setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_pinned: !r.is_pinned } : r));
   };
 
+  const assignRole = async (userId: string, role: string) => {
+    setLoading(true);
+    await supabase.from('user_roles').insert({ user_id: userId, role } as any);
+    await loadRoles();
+    setLoading(false);
+  };
+
+  const removeRole = async (userId: string, role: string) => {
+    setLoading(true);
+    await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', role as any);
+    await loadRoles();
+    setLoading(false);
+  };
+
   const formatTime = (d: string) => new Date(d).toLocaleString('ar', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   const getInitial = (n: string) => n?.charAt(0) || '?';
 
   const filteredUsers = users.filter(u => !search || u.username.toLowerCase().includes(search.toLowerCase()));
   const filteredMessages = messages.filter(m => !search || m.text.includes(search) || (m.username || '').includes(search));
+  const modRoleUserIds = roles.map(r => r.user_id);
+  const nonModUsers = filteredUsers.filter(u => !modRoleUserIds.includes(u.user_id));
 
   const TABS: { id: Tab; icon: string; label: string }[] = [
     { id: 'messages', icon: '💬', label: 'الرسائل' },
     { id: 'users', icon: '👥', label: 'المستخدمين' },
     { id: 'rooms', icon: '🏠', label: 'الغرف' },
+    { id: 'moderators', icon: '🛡️', label: 'المشرفين' },
   ];
 
   return (
