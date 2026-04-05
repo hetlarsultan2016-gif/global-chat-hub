@@ -94,7 +94,8 @@ export default function AdminPage() {
     if (tab === 'users') loadUsers();
     if (tab === 'rooms') loadRooms();
     if (tab === 'messages') loadMessages();
-  }, [tab, loadUsers, loadRooms, loadMessages]);
+    if (tab === 'moderators') { loadRoles(); loadUsers(); }
+  }, [tab, loadUsers, loadRooms, loadMessages, loadRoles]);
 
   const deleteMessage = async (id: string) => {
     setLoading(true);
