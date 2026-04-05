@@ -300,6 +300,60 @@ export default function AdminPage() {
           ))}
         </div>
       )}
+
+      {/* Moderators Tab */}
+      {tab === 'moderators' && (
+        <div className="flex-1 overflow-y-auto space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground">المشرفون الحاليون</h3>
+          {roles.length === 0 && <p className="text-center text-muted-foreground text-sm py-4 opacity-60">لا يوجد مشرفون</p>}
+          {roles.map(r => (
+            <div key={`${r.user_id}-${r.role}`} className="flex items-center gap-3 p-3 bg-card rounded-xl border border-border">
+              <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold">
+                {getInitial(r.username || '')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm truncate">{r.username}</p>
+                <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded-md">{r.role === 'admin' ? 'مشرف عام' : r.role === 'moderator' ? 'مشرف' : 'عضو'}</span>
+              </div>
+              {r.user_id !== currentUserId && (
+                <button
+                  onClick={() => removeRole(r.user_id, r.role)}
+                  disabled={loading}
+                  className="text-xs text-destructive hover:bg-destructive/10 px-2 py-1 rounded-lg transition-colors"
+                >
+                  ❌ إزالة
+                </button>
+              )}
+            </div>
+          ))}
+
+          <h3 className="text-sm font-semibold text-muted-foreground mt-4">تعيين مشرف جديد</h3>
+          {nonModUsers.map(u => (
+            <div key={u.user_id} className="flex items-center gap-3 p-2.5 bg-card rounded-xl border border-border">
+              <div className="w-8 h-8 rounded-full bg-secondary overflow-hidden flex-shrink-0 flex items-center justify-center text-sm font-bold">
+                {u.avatar_url ? <img src={u.avatar_url} className="w-full h-full object-cover" alt="" /> : getInitial(u.username)}
+              </div>
+              <p className="flex-1 font-medium text-sm truncate">{u.username}</p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => assignRole(u.user_id, 'moderator')}
+                  disabled={loading}
+                  className="text-[10px] bg-primary/15 text-primary hover:bg-primary/25 px-2 py-1 rounded-lg transition-colors"
+                >
+                  مشرف
+                </button>
+                <button
+                  onClick={() => assignRole(u.user_id, 'admin')}
+                  disabled={loading}
+                  className="text-[10px] bg-accent text-accent-foreground hover:bg-accent/80 px-2 py-1 rounded-lg transition-colors"
+                >
+                  مشرف عام
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
